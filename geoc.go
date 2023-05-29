@@ -17,25 +17,49 @@ type coordGroups struct {
 	loc string
 }
 
-func newCoordGroups(names []string, values []string) coordGroups {
+var coordRegExp = regexp.MustCompile(
+	`(\s*)` +
+		`(?P<sgn>[-+])?` +
+		`(?:(?P<deg>\d+(?:\.\d+)?)(\s*[-°]?\s*))` +
+		`(?:(?P<min>\d+(?:\.\d+)?)(\s*[-']?\s*))?` +
+		`(?:(?P<sec>\d+(?:\.\d+)?)(\s*[-"]?\s*))?` +
+		`(?P<loc>[NSEW])?(\s*)`,
+)
+
+func newCoordGroups(cs string) (*coordGroups, error) {
+	m := coordRegExp.FindAllStringSubmatch(cs, -1)
+	if m == nil {
+		return nil, errors.New("unable to match coords pattern")
+	}
+	if len(m[0]) == 0 {
+		return nil, errors.New("invalid results of coords matching")
+	}
+
+	totalLen := 0
 	cg := coordGroups{}
-	for i, name := range names {
-		if i != 0 && values[i] != "" {
+	for i, name := range coordRegExp.SubexpNames() {
+		value := m[0][i]
+		if i != 0 && value != "" {
 			switch name {
 			case "sgn":
-				cg.sgn = values[i]
+				cg.sgn = value
 			case "deg":
-				cg.deg = values[i]
+				cg.deg = value
 			case "min":
-				cg.min = values[i]
+				cg.min = value
 			case "sec":
-				cg.sec = values[i]
+				cg.sec = value
 			case "loc":
-				cg.loc = values[i]
+				cg.loc = value
 			}
+			totalLen += len(value)
 		}
 	}
-	return cg
+
+	if totalLen != len(cs) {
+		return nil, errors.New("invalid coordinate string")
+	}
+	return &cg, nil
 }
 
 func (cg coordGroups) checkLocation() error {
@@ -63,9 +87,12 @@ func checkLimits(value float64, limit float64, kind string) (float64, error) {
 }
 
 func (cg coordGroups) getDegrees() (float64, error) {
-	idx := strings.Index(cg.deg, ".")
+	if cg.deg == "" {
+		return 0, errors.New("missing degrees")
+	}
 
 	// Check float degrees & exists minutes/seconds
+	idx := strings.Index(cg.deg, ".")
 	if idx != -1 && (cg.min != "" || cg.sec != "") {
 		return 0, errors.New("invalid combination of degrees and minutes")
 	}
@@ -134,34 +161,18 @@ func (cg coordGroups) getCoord() (float64, error) {
 	return coord, nil
 }
 
-var coordRegExp = regexp.MustCompile(
-	`(?P<sgn>[-+])?` +
-		`(?:(?P<deg>\d+(?:\.\d+)?)\s*[-°]?\s*)` +
-		`(?:(?P<min>\d+(?:\.\d+)?)\s*[-']?\s*)?` +
-		`(?:(?P<sec>\d+(?:\.\d+)?)\s*[-"]?\s*)?` +
-		`(?P<loc>[NSEW])?`,
-)
-
 // StringToCoord converts geographic coordinate to string.
 // Returns float64 representation of coordinate or error
 // if coordinate string is invalid.
 func StringToCoord(cs string) (float64, error) {
-	makeErr := func(msg string) (float64, error) {
-		return 0, fmt.Errorf("%s in string %q", msg, cs)
+	gc, err := newCoordGroups(cs)
+	if err != nil {
+		return 0, fmt.Errorf("%q in string %q", err, cs)
 	}
 
-	m := coordRegExp.FindAllStringSubmatch(cs, -1)
-	if m == nil {
-		return makeErr("unable to match coords pattern")
-	}
-	if len(m[0]) == 0 {
-		return makeErr("invalid results of coords matching")
-	}
-
-	gc := newCoordGroups(coordRegExp.SubexpNames(), m[0])
 	coord, err := gc.getCoord()
 	if err != nil {
-		return makeErr(err.Error())
+		return 0, fmt.Errorf("%q in string %q", err, cs)
 	}
 
 	return coord, nil
