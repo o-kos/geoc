@@ -20,9 +20,9 @@ type coordGroups struct {
 var coordRegExp = regexp.MustCompile(
 	`(\s*)` +
 		`(?P<sgn>[-+])?` +
-		`(?:(?P<deg>\d+(?:\.\d+)?)(\s*[-°]?\s*))` +
-		`(?:(?P<min>\d+(?:\.\d+)?)(\s*[-']?\s*))?` +
-		`(?:(?P<sec>\d+(?:\.\d+)?)(\s*[-"]?\s*))?` +
+		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(\s*[-°]?\s*))` +
+		`(?:(?P<min>\d+(?:[\.,]\d+)?)(\s*[-']?\s*))?` +
+		`(?:(?P<sec>\d+(?:[\.,]\d+)?)(\s*[-"]?\s*))?` +
 		`(?P<loc>[NSEW])?(\s*)`,
 )
 
@@ -92,9 +92,12 @@ func (cg coordGroups) getDegrees() (float64, error) {
 	}
 
 	// Check float degrees & exists minutes/seconds
-	idx := strings.Index(cg.deg, ".")
+	idx := strings.IndexAny(cg.deg, ".,")
 	if idx != -1 && (cg.min != "" || cg.sec != "") {
 		return 0, errors.New("invalid combination of degrees and minutes")
+	}
+	if idx != -1 {
+		cg.deg = cg.deg[:idx] + "." + cg.deg[idx+1:]
 	}
 
 	if degrees, err := strconv.ParseFloat(cg.deg, 64); err == nil {
@@ -112,9 +115,12 @@ func (cg coordGroups) getMinutes() (float64, error) {
 		return 0, nil
 	}
 
-	idx := strings.Index(cg.min, ".")
+	idx := strings.IndexAny(cg.min, ".,")
 	if idx != -1 && cg.sec != "" {
 		return 0, errors.New("invalid combination of minutes and seconds")
+	}
+	if idx != -1 {
+		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
 	}
 
 	if minutes, err := strconv.ParseFloat(cg.min, 64); err == nil {
@@ -126,6 +132,11 @@ func (cg coordGroups) getMinutes() (float64, error) {
 func (cg coordGroups) getSeconds() (float64, error) {
 	if cg.sec == "" {
 		return 0, nil
+	}
+
+	idx := strings.IndexAny(cg.sec, ".,")
+	if idx != -1 {
+		cg.sec = cg.sec[:idx] + "." + cg.sec[idx+1:]
 	}
 
 	if seconds, err := strconv.ParseFloat(cg.sec, 64); err == nil {

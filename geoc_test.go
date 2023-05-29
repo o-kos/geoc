@@ -11,16 +11,20 @@ func TestStringToCoord(t *testing.T) {
 		expectedCoord float64
 		expectedError bool
 	}{
+		{`48-33,00'N`, 48.55, false},
+
 		{`48°33'26.9604"N`, 48.557489, false},
+		{`48°33'26,9604"N`, 48.557489, false},
 		{`48-33-26.9604N`, 48.557489, false},
 		{`48°33'27"N`, 48.5575, false},
 		{`48-33-27 N`, 48.5575, false},
 		{`48°33.4493'N`, 48.557488, false},
 		{`48-33.4493'N`, 48.557488, false},
-		{`48-33,00"N`, 48.55, false},
+		{`48-33,00'N`, 48.55, false},
 		{`48°33'N`, 48.55, false},
 		{`48-33'N`, 48.55, false},
 		{`48.557489`, 48.557489, false},
+		{`48,557489`, 48.557489, false},
 		{`-48.557489`, -48.557489, false},
 		{`48`, 48, false},
 		{`48N`, 48, false},
@@ -45,7 +49,7 @@ func TestStringToCoord(t *testing.T) {
 			}
 		} else {
 			if err != nil {
-				t.Errorf("Error %v for %q string, but excepted %f", err, tc.input, tc.expectedCoord)
+				t.Errorf("Error %v, but excepted %f", err, tc.expectedCoord)
 				continue
 			}
 
