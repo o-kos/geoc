@@ -57,19 +57,19 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 	}
 
 	if totalLen != len(cs) {
-		return nil, errors.New("invalid coordinate string")
+		return nil, errors.New("invalid coordinate format")
 	}
 	return &cg, nil
 }
 
-func (cg coordGroups) checkLocation() error {
+func (cg *coordGroups) checkLocation() error {
 	if cg.loc == "" || cg.loc == "N" || cg.loc == "S" || cg.loc == "E" || cg.loc == "W" {
 		return nil
 	}
 	return fmt.Errorf("invalid location sign %q", cg.loc)
 }
 
-func (cg coordGroups) checkSign() error {
+func (cg *coordGroups) checkSign() error {
 	if cg.sgn == "" {
 		return nil
 	}
@@ -86,7 +86,7 @@ func checkLimits(value float64, limit float64, kind string) (float64, error) {
 	return 0, fmt.Errorf("%s out of range", kind)
 }
 
-func (cg coordGroups) getDegrees() (float64, error) {
+func (cg *coordGroups) getDegrees() (float64, error) {
 	if cg.deg == "" {
 		return 0, errors.New("missing degrees")
 	}
@@ -110,7 +110,7 @@ func (cg coordGroups) getDegrees() (float64, error) {
 	return 0, errors.New("unable to convert degrees to float")
 }
 
-func (cg coordGroups) getMinutes() (float64, error) {
+func (cg *coordGroups) getMinutes() (float64, error) {
 	if cg.min == "" {
 		return 0, nil
 	}
@@ -121,6 +121,11 @@ func (cg coordGroups) getMinutes() (float64, error) {
 	}
 	if idx != -1 {
 		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
+	} else { // 48-3327N format
+		if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" {
+			cg.sec = cg.min[2:]
+			cg.min = cg.min[:2]
+		}
 	}
 
 	if minutes, err := strconv.ParseFloat(cg.min, 64); err == nil {
@@ -129,7 +134,7 @@ func (cg coordGroups) getMinutes() (float64, error) {
 	return 0, errors.New("unable to convert minutes to float")
 }
 
-func (cg coordGroups) getSeconds() (float64, error) {
+func (cg *coordGroups) getSeconds() (float64, error) {
 	if cg.sec == "" {
 		return 0, nil
 	}
@@ -145,7 +150,7 @@ func (cg coordGroups) getSeconds() (float64, error) {
 	return 0, errors.New("unable to convert seconds to float")
 }
 
-func (cg coordGroups) getCoord() (float64, error) {
+func (cg *coordGroups) getCoord() (float64, error) {
 	if err := cg.checkSign(); err != nil {
 		return 0, err
 	}

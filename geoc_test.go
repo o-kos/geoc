@@ -11,13 +11,12 @@ func TestStringToCoord(t *testing.T) {
 		expectedCoord float64
 		expectedError bool
 	}{
-		{`48-33,00'N`, 48.55, false},
-
 		{`48°33'26.9604"N`, 48.557489, false},
 		{`48°33'26,9604"N`, 48.557489, false},
 		{`48-33-26.9604N`, 48.557489, false},
 		{`48°33'27"N`, 48.5575, false},
 		{`48-33-27 N`, 48.5575, false},
+		{`48-3327N`, 48.5575, false},
 		{`48°33.4493'N`, 48.557488, false},
 		{`48-33.4493'N`, 48.557488, false},
 		{`48-33,00'N`, 48.55, false},
