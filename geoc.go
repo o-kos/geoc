@@ -15,14 +15,20 @@ type coordGroups struct {
 	min string
 	sec string
 	loc string
+	sep struct {
+		deg string
+		min string
+		sec string
+	}
+	fmt string
 }
 
 var coordRegExp = regexp.MustCompile(
 	`(\s*)` +
 		`(?P<sgn>[-+])?` +
-		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(\s*[-°]?\s*))` +
-		`(?:(?P<min>\d+(?:[\.,]\d+)?)(\s*[-']?\s*))?` +
-		`(?:(?P<sec>\d+(?:[\.,]\d+)?)(\s*[-"]?\s*))?` +
+		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(?P<dsr>\s*[-°]?\s*)?)` +
+		`(?:(?P<min>\d+(?:[\.,]\d+)?)(?P<msr>\s*[-']?\s*)?)?` +
+		`(?:(?P<sec>\d+(?:[\.,]\d+)?)(?P<ssr>\s*[ "]?\s*)?)?` +
 		`(?P<loc>[NSEW])?(\s*)`,
 )
 
@@ -33,6 +39,16 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 	}
 	if len(m[0]) == 0 {
 		return nil, errors.New("invalid results of coords matching")
+	}
+
+	makeSep := func(sep string) string {
+		if ret := strings.TrimSpace(sep); ret != "" {
+			return ret
+		}
+		if sep != "" {
+			return " "
+		}
+		return ""
 	}
 
 	totalLen := 0
@@ -51,6 +67,12 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 				cg.sec = value
 			case "loc":
 				cg.loc = value
+			case "dsr":
+				cg.sep.deg = makeSep(value)
+			case "msr":
+				cg.sep.min = makeSep(value)
+			case "ssr":
+				cg.sep.sec = makeSep(value)
 			}
 			totalLen += len(value)
 		}
@@ -62,11 +84,28 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 	return &cg, nil
 }
 
-func (cg *coordGroups) checkLocation() error {
-	if cg.loc == "" || cg.loc == "N" || cg.loc == "S" || cg.loc == "E" || cg.loc == "W" {
+func (cg *coordGroups) checkLocation(loc string) error {
+	if cg.loc == "" {
 		return nil
 	}
-	return fmt.Errorf("invalid location sign %q", cg.loc)
+
+	if cg.loc != "N" && cg.loc != "S" && cg.loc != "E" && cg.loc != "W" {
+		return fmt.Errorf("invalid location sign %q", cg.loc)
+	}
+
+	if loc == "" {
+		return nil
+	}
+
+	if loc == "lat" && (cg.loc != "S" && cg.loc != "N") {
+		return fmt.Errorf("invalid latitude locastion sign %q", cg.loc)
+	}
+
+	if loc == "lon" && (cg.loc != "W" && cg.loc != "E") {
+		return fmt.Errorf("invalid longtitude locastion sign %q", cg.loc)
+	}
+
+	return nil
 }
 
 func (cg *coordGroups) checkSign() error {
@@ -86,11 +125,12 @@ func checkLimits(value float64, limit float64, kind string) (float64, error) {
 	return 0, fmt.Errorf("%s out of range", kind)
 }
 
-func (cg *coordGroups) getDegrees() (float64, error) {
+func (cg *coordGroups) getDegrees(loc string) (float64, error) {
 	if cg.deg == "" {
 		return 0, errors.New("missing degrees")
 	}
 
+	cg.fmt = "d"
 	// Check float degrees & exists minutes/seconds
 	idx := strings.IndexAny(cg.deg, ".,")
 	if idx != -1 && (cg.min != "" || cg.sec != "") {
@@ -98,11 +138,15 @@ func (cg *coordGroups) getDegrees() (float64, error) {
 	}
 	if idx != -1 {
 		cg.deg = cg.deg[:idx] + "." + cg.deg[idx+1:]
+		cg.fmt += "f"
+	} else {
+		cg.fmt += "i"
 	}
+	cg.fmt += cg.sep.deg
 
 	if degrees, err := strconv.ParseFloat(cg.deg, 64); err == nil {
 		limit := 180.0
-		if cg.loc == "S" || cg.loc == "N" {
+		if cg.loc == "S" || cg.loc == "N" || loc == "lat" {
 			limit = 90.0
 		}
 		return checkLimits(degrees, limit, "degrees")
@@ -115,18 +159,22 @@ func (cg *coordGroups) getMinutes() (float64, error) {
 		return 0, nil
 	}
 
+	cg.fmt += "m"
 	idx := strings.IndexAny(cg.min, ".,")
 	if idx != -1 && cg.sec != "" {
 		return 0, errors.New("invalid combination of minutes and seconds")
 	}
 	if idx != -1 {
 		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
+		cg.fmt += "f"
 	} else { // 48-3327N format
 		if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" {
 			cg.sec = cg.min[2:]
 			cg.min = cg.min[:2]
 		}
+		cg.fmt += "i"
 	}
+	cg.fmt += cg.sep.min
 
 	if minutes, err := strconv.ParseFloat(cg.min, 64); err == nil {
 		return checkLimits(minutes, 60, "minutes")
@@ -139,10 +187,15 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 		return 0, nil
 	}
 
+	cg.fmt += "s"
 	idx := strings.IndexAny(cg.sec, ".,")
 	if idx != -1 {
 		cg.sec = cg.sec[:idx] + "." + cg.sec[idx+1:]
+		cg.fmt += "f"
+	} else {
+		cg.fmt += "i"
 	}
+	cg.fmt += cg.sep.sec
 
 	if seconds, err := strconv.ParseFloat(cg.sec, 64); err == nil {
 		return checkLimits(seconds, 60, "seconds")
@@ -150,14 +203,15 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 	return 0, errors.New("unable to convert seconds to float")
 }
 
-func (cg *coordGroups) getCoord() (float64, error) {
+func (cg *coordGroups) getCoord(loc string) (float64, error) {
 	if err := cg.checkSign(); err != nil {
 		return 0, err
 	}
-	if err := cg.checkLocation(); err != nil {
+	if err := cg.checkLocation(loc); err != nil {
 		return 0, err
 	}
-	deg, err := cg.getDegrees()
+
+	deg, err := cg.getDegrees(loc)
 	if err != nil {
 		return 0, err
 	}
@@ -169,6 +223,7 @@ func (cg *coordGroups) getCoord() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+	cg.fmt += cg.loc
 
 	coord := deg + min/60 + sec/3600
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
@@ -177,19 +232,66 @@ func (cg *coordGroups) getCoord() (float64, error) {
 	return coord, nil
 }
 
-// StringToCoord converts geographic coordinate to string.
-// Returns float64 representation of coordinate or error
+type Point struct {
+	Lat float64
+	Lon float64
+}
+
+func (p *Point) String() string {
+	return fmt.Sprintf(
+		"[%s, %s]",
+		strings.TrimRight(strconv.FormatFloat(p.Lat, 'f', 6, 64), "0"),
+		strings.TrimRight(strconv.FormatFloat(p.Lon, 'f', 6, 64), "0"),
+	)
+}
+
+// StringToCoord converts string presentation
+// of geographic coordinate to native float number.
+// Returns float64 value of coordinate or error
 // if coordinate string is invalid.
 func StringToCoord(cs string) (float64, error) {
 	gc, err := newCoordGroups(cs)
 	if err != nil {
-		return 0, fmt.Errorf("%q in string %q", err, cs)
+		return 0, fmt.Errorf("%v in string %q", err, cs)
 	}
 
-	coord, err := gc.getCoord()
+	coord, err := gc.getCoord("")
 	if err != nil {
-		return 0, fmt.Errorf("%q in string %q", err, cs)
+		return 0, fmt.Errorf("%v in string %q", err, cs)
 	}
 
 	return coord, nil
+}
+
+// StringToPoint converts a pair of geographic coordinates string to Point.
+// Returns float64 representation of coordinates or error
+// if coordinate string is invalid.
+func StringToPoint(lat string, lon string) (Point, error) {
+	retErr := func(err error, str string) (Point, error) {
+		return Point{}, fmt.Errorf("%v in string %q", err, str)
+	}
+
+	gt, err := newCoordGroups(lat)
+	if err != nil {
+		return retErr(err, lat)
+	}
+	pt, err := gt.getCoord("lat")
+	if err != nil {
+		return retErr(err, lat)
+	}
+
+	gn, err := newCoordGroups(lon)
+	if err != nil {
+		return retErr(err, lon)
+	}
+	pn, err := gn.getCoord("lon")
+	if err != nil {
+		return retErr(err, lon)
+	}
+
+	if gt.fmt != gn.fmt {
+		return Point{}, fmt.Errorf("formats of lat (%q) and lon (%q) strings are not identical", lat, lon)
+	}
+
+	return Point{pt, pn}, nil
 }
