@@ -146,9 +146,6 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 	}
 	if idx != -1 {
 		cg.deg = cg.deg[:idx] + "." + cg.deg[idx+1:]
-		cg.fmt += "f"
-	} else {
-		cg.fmt += "i"
 	}
 	cg.fmt += cg.sep.deg
 
@@ -174,13 +171,11 @@ func (cg *coordGroups) getMinutes() (float64, error) {
 	}
 	if idx != -1 {
 		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
-		cg.fmt += "f"
 	} else { // 48-3327N format
 		if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" {
 			cg.sec = cg.min[2:]
 			cg.min = cg.min[:2]
 		}
-		cg.fmt += "i"
 	}
 	cg.fmt += cg.sep.min
 
@@ -199,9 +194,6 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 	idx := strings.IndexAny(cg.sec, ".,")
 	if idx != -1 {
 		cg.sec = cg.sec[:idx] + "." + cg.sec[idx+1:]
-		cg.fmt += "f"
-	} else {
-		cg.fmt += "i"
 	}
 	cg.fmt += cg.sep.sec
 

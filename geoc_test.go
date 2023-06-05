@@ -73,6 +73,8 @@ func TestStringToPoint(t *testing.T) {
 	testCases := append(
 		goodCases,
 		[]testCase{
+			{`48-33N; 048-33.0E`, 48.55, false},
+
 			{`48N; 48N`, 0, true},
 			{`48°33'26,9604"N; 48-33-26.9604E`, 0, true},
 			{`48°33'27"N; 48-33-27 E`, 0, true},
