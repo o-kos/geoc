@@ -71,15 +71,15 @@ func TestStringToCoord(t *testing.T) {
 
 func TestStringToPoint(t *testing.T) {
 	testCases := append(
+		goodCases,
 		[]testCase{
-			{`48 N; 48 °E`, 0, true},
-			{`48'N`, 0, true},
-			{`-48N`, 0, true},
-			{`+48N`, 0, true},
-			{`48°33.4493"N`, 0, true},
-			{"invalid string", 0, true},
-		},
-		goodCases...,
+			{`48N; 48N`, 0, true},
+			{`48°33'26,9604"N; 48-33-26.9604E`, 0, true},
+			{`48°33'27"N; 48-33-27 E`, 0, true},
+			{`48-3327N; 48°33.4493'E`, 0, true},
+			{`48-33,00'N; 48°33'E`, 0, true},
+			{`48-33'N; 48.557489`, 0, true},
+		}...,
 	)
 
 	for _, tc := range testCases {
@@ -96,18 +96,18 @@ func TestStringToPoint(t *testing.T) {
 		if tc.expectedError {
 			if err == nil {
 				t.Errorf("Expected error for %q string, got nil", cs)
-			} else {
-				if err != nil {
-					t.Errorf("Error %v, but excepted %f", err, tc.expectedCoord)
-					continue
-				}
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Error %v, but excepted %f", err, tc.expectedCoord)
+				continue
+			}
 
-				if math.Abs(point.Lat-tc.expectedCoord) > 0.000001 {
-					t.Errorf("For string %q expected lat is %f, but got %f", cs, tc.expectedCoord, point.Lat)
-				}
-				if math.Abs(point.Lat-tc.expectedCoord) > 0.000001 {
-					t.Errorf("For string %q expected lat is %f, but got %f", cs, tc.expectedCoord, point.Lat)
-				}
+			if math.Abs(point.Lat-tc.expectedCoord) > 0.000001 {
+				t.Errorf("For string %q expected lat is %f, but got %f", cs, tc.expectedCoord, point.Lat)
+			}
+			if math.Abs(point.Lat-tc.expectedCoord) > 0.000001 {
+				t.Errorf("For string %q expected lat is %f, but got %f", cs, tc.expectedCoord, point.Lat)
 			}
 		}
 	}
