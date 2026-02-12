@@ -4,6 +4,7 @@ package geoc
 import (
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -42,13 +43,14 @@ var coordRegExp = regexp.MustCompile(
 		`(?P<loc>[NSEW])?(\s*)`,
 )
 
-func newCoordGroups(cs string) (*coordGroups, error) {
+func newCoordGroups(cs string) (coordGroups, error) {
+	cg := coordGroups{}
 	m := coordRegExp.FindAllStringSubmatch(cs, -1)
 	if m == nil {
-		return nil, errors.New("unable to match coords pattern")
+		return cg, errors.New("unable to match coords pattern")
 	}
 	if len(m[0]) == 0 {
-		return nil, errors.New("invalid results of coords matching")
+		return cg, errors.New("invalid results of coords matching")
 	}
 
 	makeSep := func(sep string) string {
@@ -62,7 +64,6 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 	}
 
 	totalLen := 0
-	cg := coordGroups{}
 	for i, name := range coordRegExp.SubexpNames() {
 		value := m[0][i]
 		if i != 0 && value != "" {
@@ -89,9 +90,31 @@ func newCoordGroups(cs string) (*coordGroups, error) {
 	}
 
 	if totalLen != len(cs) {
-		return nil, errors.New("invalid coordinate format")
+		return cg, errors.New("invalid coordinate format")
 	}
-	return &cg, nil
+	return cg, nil
+}
+
+func newPointGroups(cs string) (coordGroups, coordGroups, error) {
+	var cgLat coordGroups
+	var cgLon coordGroups
+	m := coordRegExp.FindAllStringSubmatch(cs, -1)
+	if m == nil {
+		return cgLat, cgLon, errors.New("unable to match coords pattern")
+	}
+	if len(m) != 2 {
+		return cgLat, cgLon, errors.New("invalid coords count")
+	}
+	if len(m[0]) == 0 {
+		return cgLat, cgLon, errors.New("invalid results of lat-coords matching")
+	}
+	if len(m[1]) == 0 {
+		return cgLat, cgLon, errors.New("invalid results of lon-coords matching")
+	}
+
+	//	fillCoordGroups(cs)
+
+	return cgLat, cgLon, nil
 }
 
 type Location int
@@ -102,28 +125,184 @@ const (
 	Lon
 )
 
-func (cg *coordGroups) checkLocation(loc Location) error {
-	if cg.loc == "" {
-		return nil
+// Coord represents a geographic coordinate with its location type.
+type Coord struct {
+	Value float64
+	Loc   Location
+}
+
+// CoordError wraps coordinate parsing errors with the original input string.
+type CoordError struct {
+	Coord string
+	Err   error
+}
+
+func (e CoordError) Error() string {
+	if e.Err == nil {
+		return "invalid coordinate"
+	}
+	return e.Err.Error() + " in string " + strconv.Quote(e.Coord)
+}
+
+func (e CoordError) Unwrap() error {
+	return e.Err
+}
+
+// Format converts coordinate to string representation
+// using provided example format string.
+func (c Coord) Format(example string) (string, error) {
+	cg, err := newCoordGroups(example)
+	if err != nil {
+		return "", fmt.Errorf("invalid example format: %v", err)
 	}
 
-	if cg.loc != "N" && cg.loc != "S" && cg.loc != "E" && cg.loc != "W" {
-		return fmt.Errorf("invalid location sign %q", cg.loc)
-	}
-
+	// Use Coord's Loc if set, otherwise derive from example
+	loc := c.Loc
 	if loc == None {
-		return nil
+		if cg.loc == "N" || cg.loc == "S" {
+			loc = Lat
+		} else if cg.loc == "E" || cg.loc == "W" {
+			loc = Lon
+		}
 	}
 
-	if loc == Lat && (cg.loc != "S" && cg.loc != "N") {
-		return fmt.Errorf("invalid latitude location sign %q", cg.loc)
+	// Validate coord bounds
+	absCoord := math.Abs(c.Value)
+	if loc == Lat && absCoord >= 90 {
+		return "", fmt.Errorf("coordinate %f out of range for latitude", c.Value)
+	}
+	if loc == Lon && absCoord >= 180 {
+		return "", fmt.Errorf("coordinate %f out of range for longitude", c.Value)
 	}
 
-	if loc == Lon && (cg.loc != "W" && cg.loc != "E") {
-		return fmt.Errorf("invalid longtitude location sign %q", cg.loc)
+	negative := c.Value < 0
+
+	// Detect compact format (e.g., 120-5749E): 4 integer digits in minutes
+	isCompact := len(cg.min) == 4 && cg.sec == "" && cg.loc != "" && strings.IndexAny(cg.min, ".,") == -1
+	hasSec := cg.sec != "" || isCompact
+	hasMin := cg.min != ""
+
+	// Detect decimal separator and precision from the most specific component
+	decSep := "."
+	precision := 0
+	detectDecimal := func(s string) {
+		if idx := strings.IndexAny(s, ".,"); idx != -1 {
+			decSep = string(s[idx])
+			precision = len(s) - idx - 1
+		}
+	}
+	if hasSec && !isCompact {
+		detectDecimal(cg.sec)
+	} else if hasMin && !isCompact {
+		detectDecimal(cg.min)
+	} else if !hasMin {
+		detectDecimal(cg.deg)
 	}
 
-	return nil
+	// Detect degree width for zero-padding (e.g., "048" → width 3)
+	degWidth := len(cg.deg)
+	if idx := strings.IndexAny(cg.deg, ".,"); idx != -1 {
+		degWidth = idx
+	}
+
+	// Determine output location letter
+	locLetter := ""
+	if cg.loc != "" {
+		if loc == Lat {
+			locLetter = "N"
+			if negative {
+				locLetter = "S"
+			}
+		} else {
+			locLetter = "E"
+			if negative {
+				locLetter = "W"
+			}
+		}
+	}
+
+	// DegDec format
+	if !hasMin {
+		var degStr string
+		if precision > 0 {
+			totalWidth := degWidth + 1 + precision
+			degStr = fmt.Sprintf("%0*.*f", totalWidth, precision, absCoord)
+		} else {
+			degStr = fmt.Sprintf("%0*.0f", degWidth, absCoord)
+		}
+		if decSep == "," {
+			degStr = strings.Replace(degStr, ".", ",", 1)
+		}
+		if negative && cg.loc == "" {
+			degStr = "-" + degStr
+		} else if cg.sgn == "+" {
+			degStr = "+" + degStr
+		}
+		return degStr + cg.sep.deg + locLetter, nil
+	}
+
+	deg := math.Floor(absCoord)
+	degStr := fmt.Sprintf("%0*.0f", degWidth, deg)
+
+	// MinDec format
+	if !hasSec {
+		minutes := (absCoord - deg) * 60
+		minStr := fmt.Sprintf("%.*f", precision, minutes)
+		if decSep == "," {
+			minStr = strings.Replace(minStr, ".", ",", 1)
+		}
+		return degStr + cg.sep.deg + minStr + cg.sep.min + locLetter, nil
+	}
+
+	// DMS format
+	totalMin := (absCoord - deg) * 60
+	minutes := math.Floor(totalMin)
+	sec := (totalMin - minutes) * 60
+
+	if isCompact {
+		return degStr + cg.sep.deg + fmt.Sprintf("%02.0f", minutes) + fmt.Sprintf("%02.0f", sec) + locLetter, nil
+	}
+
+	minStr := fmt.Sprintf("%.0f", minutes)
+	secStr := fmt.Sprintf("%.*f", precision, sec)
+	if decSep == "," {
+		secStr = strings.Replace(secStr, ".", ",", 1)
+	}
+	return degStr + cg.sep.deg + minStr + cg.sep.min + secStr + cg.sep.sec + locLetter, nil
+}
+
+// String returns default string representation of the coordinate.
+// Latitude uses MinDec format (48-33.0N), longitude uses MinDec
+// with 3-digit degrees (048-33.0E), unspecified uses decimal degrees.
+func (c Coord) String() string {
+	var example string
+	switch c.Loc {
+	case Lat:
+		example = "48-33.0N"
+	case Lon:
+		example = "048-33.0E"
+	default:
+		example = "48.557489"
+	}
+	s, err := c.Format(example)
+	if err != nil {
+		return strconv.FormatFloat(c.Value, 'f', -1, 64)
+	}
+	return s
+}
+
+func (cg *coordGroups) getLocation() (Location, error) {
+	if cg.loc == "N" || cg.loc == "S" {
+		return Lat, nil
+	}
+	if cg.loc == "E" || cg.loc == "W" {
+		return Lon, nil
+	}
+	if cg.loc == "" {
+		return None, nil
+	}
+
+	return None, fmt.Errorf("invalid location sign %q", cg.loc)
 }
 
 func (cg *coordGroups) checkSign() error {
@@ -213,97 +392,145 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 	return 0, errors.New("unable to convert seconds to float")
 }
 
-func (cg *coordGroups) getCoord(loc Location) (float64, error) {
+func (cg *coordGroups) getCoord() (Coord, error) {
+	var coord Coord
 	if err := cg.checkSign(); err != nil {
-		return 0, err
+		return coord, err
 	}
-	if err := cg.checkLocation(loc); err != nil {
-		return 0, err
+	loc, err := cg.getLocation()
+	if err != nil {
+		return coord, err
 	}
-
 	deg, err := cg.getDegrees(loc)
 	if err != nil {
-		return 0, err
+		return coord, err
 	}
 	minutes, err := cg.getMinutes()
 	if err != nil {
-		return 0, err
+		return coord, err
 	}
 	sec, err := cg.getSeconds()
 	if err != nil {
-		return 0, err
+		return coord, err
 	}
 	if cg.loc != "" {
 		cg.fmt += "l"
 	}
 
-	coord := deg + minutes/60 + sec/3600
+	coord.Value = deg + minutes/60 + sec/3600
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
-		coord = -coord
+		coord.Value = -coord.Value
 	}
 	return coord, nil
 }
 
+// Point represents a geographic point with latitude and longitude.
 type Point struct {
-	Lat float64
-	Lon float64
+	Lat Coord
+	Lon Coord
 }
 
-func (p *Point) String() string {
-	return fmt.Sprintf(
-		"[%s, %s]",
-		strings.TrimRight(strconv.FormatFloat(p.Lat, 'f', 6, 64), "0"),
-		strings.TrimRight(strconv.FormatFloat(p.Lon, 'f', 6, 64), "0"),
-	)
-}
-
-// StringToCoord converts string presentation
-// of geographic coordinate to native float number.
-// Returns float64 value of coordinate or error
-// if coordinate string is invalid.
-func StringToCoord(cs string) (float64, error) {
-	gc, err := newCoordGroups(cs)
+// Format converts Point to string representation using provided
+// format examples for latitude and longitude coordinates.
+func (p Point) Format(latFmt, lonFmt string) (string, error) {
+	lat, err := p.Lat.Format(latFmt)
 	if err != nil {
-		return 0, fmt.Errorf("%v in string %q", err, cs)
+		return "", fmt.Errorf("latitude: %v", err)
+	}
+	lon, err := p.Lon.Format(lonFmt)
+	if err != nil {
+		return "", fmt.Errorf("longitude: %v", err)
+	}
+	return lat + "; " + lon, nil
+}
+
+func (p Point) String() string {
+	s, err := p.Format("48-33.0N", "048-33.0E")
+	if err != nil {
+		return fmt.Sprintf(
+			"[%s, %s]",
+			strings.TrimRight(strconv.FormatFloat(p.Lat.Value, 'f', 6, 64), "0"),
+			strings.TrimRight(strconv.FormatFloat(p.Lon.Value, 'f', 6, 64), "0"),
+		)
+	}
+	return s
+}
+
+// parseCoordGroups parses a coordinate string, determines its location type,
+// and returns the parsed groups, coordinate value, and location.
+// func parseCoordGroups(s string, loc Location) (coordGroups, float64, error) {
+// 	cg, err := newCoordGroups(s)
+// 	if err != nil {
+// 		return nil, 0, fmt.Errorf("%v in string %q", err, s)
+// 	}
+
+// 	if loc == None {
+// 		if cg.loc == "N" || cg.loc == "S" {
+// 			loc = Lat
+// 		} else if cg.loc == "E" || cg.loc == "W" {
+// 			loc = Lon
+// 		}
+// 	}
+
+// 	value, err := cg.getCoord(loc)
+// 	if err != nil {
+// 		return nil, 0, fmt.Errorf("%v in string %q", err, s)
+// 	}
+
+// 	return cg, value, nil
+// }
+
+// ParseCoord parses a coordinate string and returns a Coord.
+// Location type (Lat/Lon) is auto-detected from the location letter (N/S/E/W).
+func ParseCoord(s string) (Coord, error) {
+	coord := Coord{}
+	cg, err := newCoordGroups(s)
+	if err != nil {
+		return coord, fmt.Errorf("%v in string %q", err, s)
 	}
 
-	coord, err := gc.getCoord(None)
+	coord, err = cg.getCoord()
 	if err != nil {
-		return 0, fmt.Errorf("%v in string %q", err, cs)
+		return coord, fmt.Errorf("%v in string %q", err, s)
 	}
 
 	return coord, nil
+}
+
+// ParsePoint parses a string containing latitude and longitude.
+// Latitude is parsed from the beginning of the string; longitude is then
+// searched to the right starting from the next symbol after latitude.
+func ParsePoint(s string) (Point, error) {
+	p := Point{}
+	cgLat, cgLon, err := newPointGroups(s)
+	if err != nil {
+		return p, CoordError{Coord: s, Err: err}
+	}
+	if cgLat.formatClass() != cgLon.formatClass() {
+		return p, fmt.Errorf("formats of lat and lon parts of string (%q) are incompatible", s)
+	}
+
+	lat, err := cgLat.getCoord()
+	if err != nil {
+		return p, CoordError{Coord: s, Err: err}
+	}
+
+	lon, err := cgLon.getCoord()
+	if err != nil {
+		return p, CoordError{Coord: s, Err: err}
+	}
+
+	return Point{lat, lon}, nil
+}
+
+// StringToCoord converts string presentation of geographic coordinate to Coord.
+// Deprecated: Use ParseCoord instead.
+func StringToCoord(cs string) (Coord, error) {
+	return ParseCoord(cs)
 }
 
 // StringToPoint converts a pair of geographic coordinates string to Point.
-// Returns float64 representation of coordinates or error
-// if coordinate string is invalid.
+// Deprecated: Use ParsePoint instead.
 func StringToPoint(lat string, lon string) (Point, error) {
-	retErr := func(err error, str string) (Point, error) {
-		return Point{}, fmt.Errorf("%v in string %q", err, str)
-	}
-
-	gt, err := newCoordGroups(lat)
-	if err != nil {
-		return retErr(err, lat)
-	}
-	pt, err := gt.getCoord(Lat)
-	if err != nil {
-		return retErr(err, lat)
-	}
-
-	gn, err := newCoordGroups(lon)
-	if err != nil {
-		return retErr(err, lon)
-	}
-	pn, err := gn.getCoord(Lon)
-	if err != nil {
-		return retErr(err, lon)
-	}
-
-	if gt.formatClass() != gn.formatClass() {
-		return Point{}, fmt.Errorf("formats of lat (%q) and lon (%q) strings are incompatible", lat, lon)
-	}
-
-	return Point{pt, pn}, nil
+	return ParsePoint(lat + "; " + lon)
 }
