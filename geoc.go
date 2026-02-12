@@ -23,6 +23,16 @@ type coordGroups struct {
 	fmt string
 }
 
+func (cg *coordGroups) formatClass() string {
+	if cg.min == "" {
+		return "degdec"
+	}
+	if cg.sec == "" {
+		return "mindec"
+	}
+	return "dms"
+}
+
 var coordRegExp = regexp.MustCompile(
 	`(\s*)` +
 		`(?P<sgn>[-+])?` +
@@ -215,7 +225,7 @@ func (cg *coordGroups) getCoord(loc Location) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	min, err := cg.getMinutes()
+	minutes, err := cg.getMinutes()
 	if err != nil {
 		return 0, err
 	}
@@ -227,7 +237,7 @@ func (cg *coordGroups) getCoord(loc Location) (float64, error) {
 		cg.fmt += "l"
 	}
 
-	coord := deg + min/60 + sec/3600
+	coord := deg + minutes/60 + sec/3600
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
 		coord = -coord
 	}
@@ -291,8 +301,8 @@ func StringToPoint(lat string, lon string) (Point, error) {
 		return retErr(err, lon)
 	}
 
-	if gt.fmt != gn.fmt {
-		return Point{}, fmt.Errorf("formats of lat (%q) and lon (%q) strings are not identical", lat, lon)
+	if gt.formatClass() != gn.formatClass() {
+		return Point{}, fmt.Errorf("formats of lat (%q) and lon (%q) strings are incompatible", lat, lon)
 	}
 
 	return Point{pt, pn}, nil
