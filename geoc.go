@@ -358,17 +358,13 @@ func coordGroupsFromMatch(matches []string, subNames []string) (coordGroups, int
 
 func newCoordGroups(cs string) (coordGroups, error) {
 	cg := coordGroups{}
-	matchLen := len(coordRegExp.FindAllStringIndex(cs, -1))
-	if matchLen == 0 {
+	// Request up to 2 matches to detect "too many coords" case
+	m := coordRegExp.FindAllStringSubmatch(cs, 2)
+	if len(m) == 0 {
 		return cg, fmt.Errorf("%w: coords not found", ErrInvalidString)
 	}
-	if matchLen > 1 {
+	if len(m) > 1 {
 		return cg, fmt.Errorf("%w: too many coords found", ErrInvalidString)
-	}
-
-	m := coordRegExp.FindAllStringSubmatch(cs, 1)
-	if len(m[0]) == 0 {
-		return cg, fmt.Errorf("%w: coords is empty", ErrInvalidString)
 	}
 
 	cg, totalLen := coordGroupsFromMatch(m[0], coordRegExp.SubexpNames())
@@ -383,23 +379,16 @@ func newCoordGroups(cs string) (coordGroups, error) {
 func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLat := coordGroups{}
 	cgLon := coordGroups{}
-	matchLen := len(coordRegExp.FindAllStringIndex(cs, -1))
-	if matchLen == 0 {
+	// Request up to 3 matches to detect "too many coords" case
+	m := coordRegExp.FindAllStringSubmatch(cs, 3)
+	if len(m) == 0 {
 		return cgLat, cgLon, fmt.Errorf("%w: coords not found", ErrInvalidString)
 	}
-	if matchLen == 1 {
+	if len(m) == 1 {
 		return cgLat, cgLon, fmt.Errorf("%w: too few coords found", ErrInvalidString)
 	}
-	if matchLen > 2 {
+	if len(m) > 2 {
 		return cgLat, cgLon, fmt.Errorf("%w: too many coords found", ErrInvalidString)
-	}
-
-	m := coordRegExp.FindAllStringSubmatch(cs, 2)
-	if len(m[0]) == 0 {
-		return cgLat, cgLon, fmt.Errorf("%w: latitude is empty", ErrInvalidString)
-	}
-	if len(m[1]) == 0 {
-		return cgLat, cgLon, fmt.Errorf("%w: longitude is empty", ErrInvalidString)
 	}
 
 	sen := coordRegExp.SubexpNames()
