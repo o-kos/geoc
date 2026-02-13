@@ -81,10 +81,10 @@ func (c Coord) Format(example string) (string, error) {
 
 	// Validate coord bounds
 	absCoord := math.Abs(c.Value)
-	if loc == Lat && absCoord >= 90 {
+	if loc == Lat && absCoord > 90 {
 		return "", fmt.Errorf("%w: latitude %f", ErrOutOfRange, c.Value)
 	}
-	if loc == Lon && absCoord >= 180 {
+	if loc == Lon && absCoord > 180 {
 		return "", fmt.Errorf("%w: longitude %f", ErrOutOfRange, c.Value)
 	}
 
@@ -451,7 +451,10 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 		if cg.loc == "S" || cg.loc == "N" || loc == Lat {
 			limit = 90.0
 		}
-		return checkLimits(degrees, limit, "degrees")
+		if degrees > limit {
+			return 0, fmt.Errorf("%w: degrees", ErrOutOfRange)
+		}
+		return degrees, nil
 	}
 
 	return 0, fmt.Errorf("%w: bad degrees %q", ErrInvalidCoord, cg.deg)

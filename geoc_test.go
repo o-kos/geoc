@@ -61,7 +61,7 @@ func TestCoordFormatNegative(t *testing.T) {
 		example string
 	}{
 		{`48.0`, `invalid`},
-		{`90.0`, `48°33'27"N`}, // latitude out of range
+		{`90.1`, `48°33'27"N`}, // latitude out of range
 	}
 
 	for _, tc := range testCases {
@@ -113,14 +113,14 @@ func TestCoordString(t *testing.T) {
 			expected: "-48.557489",
 		},
 		{
-			name:     "fallback_on_invalid_lat",
+			name:     "boundary_lat_90",
 			coord:    Coord{Value: 90, Loc: Lat},
-			expected: "90",
+			expected: "90-0.0N",
 		},
 		{
-			name:     "fallback_on_invalid_lon",
+			name:     "boundary_lon_180",
 			coord:    Coord{Value: 180, Loc: Lon},
-			expected: "180",
+			expected: "180-0.0E",
 		},
 	}
 
@@ -186,7 +186,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "lat_out_of_range",
-			point:       Point{Lat: Coord{Value: 90.0, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 90.1, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
 			latFmt:      `48°33'27"N`,
 			lonFmt:      `120°57'49"E`,
 			separator:   " ",
@@ -194,7 +194,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "lon_out_of_range",
-			point:       Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 180.0, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 180.1, Loc: Lon}},
 			latFmt:      `48°33'27"N`,
 			lonFmt:      `120°57'49"E`,
 			separator:   " ",
@@ -246,14 +246,14 @@ func TestPointString(t *testing.T) {
 			expected: "48-33.0N 048-33.0E",
 		},
 		{
-			name:     "fallback_when_lat_out_of_range",
+			name:     "boundary_lat_90",
 			point:    Point{Lat: Coord{Value: 90, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
-			expected: "",
+			expected: "90-0.0N 120-57.8E",
 		},
 		{
-			name:     "fallback_when_lon_out_of_range",
+			name:     "boundary_lon_180",
 			point:    Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 180, Loc: Lon}},
-			expected: "",
+			expected: "48-33.4N 180-0.0E",
 		},
 	}
 
@@ -303,6 +303,12 @@ func TestParseCoordPositive(t *testing.T) {
 		{`48 N`, 48, Lat},
 		{`48  ° N`, 48, Lat},
 		{`98E`, 98, Lon},
+
+		// Boundary values
+		{`90N`, 90, Lat},
+		{`90S`, -90, Lat},
+		{`180E`, 180, Lon},
+		{`180W`, -180, Lon},
 	}
 
 	for _, tc := range testCases {
