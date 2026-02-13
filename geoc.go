@@ -1,4 +1,5 @@
-// Package geoc provides geographic coordinate converter from string to native float64.
+// Package geoc parses and formats geographic coordinates and points.
+// It supports conversion between string representations and native values.
 package geoc
 
 import (
@@ -12,9 +13,9 @@ import (
 type Location int
 
 const (
-	None Location = iota
-	Lat
-	Lon
+	None Location = iota // None means location type is not specified.
+	Lat                  // Lat means coordinate is latitude.
+	Lon                  // Lon means coordinate is longitude.
 )
 
 // Coord represents a geographic coordinate with its location type.
@@ -35,9 +36,12 @@ type ParseError string
 func (e ParseError) Error() string { return string(e) }
 
 const (
+	// ErrInvalidString indicates that input string cannot be parsed.
 	ErrInvalidString = ParseError("unable to parse coordinates string")
-	ErrInvalidCoord  = ParseError("invalid coordinate")
-	ErrOutOfRange    = ParseError("out of range")
+	// ErrInvalidCoord indicates that coordinate components are inconsistent.
+	ErrInvalidCoord = ParseError("invalid coordinate")
+	// ErrOutOfRange indicates that coordinate value is outside allowed limits.
+	ErrOutOfRange = ParseError("out of range")
 )
 
 // ParseCoord parses a coordinate string and returns a Coord.
@@ -203,6 +207,7 @@ func (c Coord) String() string {
 // ParsePoint parses a string containing latitude and longitude.
 // Latitude is parsed from the beginning of the string; longitude is then
 // searched to the right starting from the next symbol after latitude.
+// Latitude and longitude must use compatible format classes (degDec/minDec/dms).
 func ParsePoint(s string) (Point, error) {
 	p := Point{}
 	cgLat, cgLon, err := newPointGroups(s)
@@ -235,8 +240,8 @@ func ParsePoint(s string) (Point, error) {
 	return Point{lat, lon}, nil
 }
 
-// Format converts Point to string representation using provided
-// format examples for latitude and longitude coordinates.
+// Format converts Point to string representation using provided format
+// examples for latitude and longitude coordinates and joins them with separator.
 func (p Point) Format(latFmt, lonFmt, separator string) (string, error) {
 	lat, err := p.Lat.Format(latFmt)
 	if err != nil {
@@ -249,6 +254,9 @@ func (p Point) Format(latFmt, lonFmt, separator string) (string, error) {
 	return lat + separator + lon, nil
 }
 
+// String returns default string representation of the point.
+// Default format is "48-33.0N 048-33.0E".
+// If formatting fails, empty string is returned.
 func (p Point) String() string {
 	s, err := p.Format("48-33.0N", "048-33.0E", " ")
 	if err != nil {

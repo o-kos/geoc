@@ -1,42 +1,62 @@
-# geoc - Golang geographic coordinates converter
+# geoc
 
-Provide conversion from popular string representation of
-geographic coordinates to golang-native float64 format.
+`geoc` parses and formats geographic coordinates and points in Go.
 
-## Supported formats
+## Installation
 
-`geoc` support coordinate in the three basic forms:
+```bash
+go get github.com/o-kos/geoc
+```
 
-- Degrees (integer), minutes (integer), and seconds (integer, or real number) (DMS).
-  - `48°33'27"N`,
-  - `48-33-27 N`,
-  - `120-5749E` (compact `MMSS`, i.e. `120°57'49"E`),
-  - `48-33-26.9604N`, etc.
-- Degrees (integer) and minutes (real number) (MinDec).
-  - `48-33N`,
-  - `48°33.4493'N`,
-  - `48-33.49128N`, etc.
-- Degrees (real number) (DegDec).
-  - `48.557489`,
-  - `+48.557489`,
-  - `-39.298358`, etc.
+## Supported coordinate formats
 
-## StringToPoint format matching
+- DMS (degrees, minutes, seconds)
+  - `48°33'27"N`
+  - `48-33-27 N`
+  - `120-5749E` (compact `MMSS`, equivalent to `120°57'49"E`)
+  - `48-33-26.9604N`
+- MinDec (degrees and decimal minutes)
+  - `48-33N`
+  - `48°33.4493'N`
+  - `48-33.49128N`
+- DegDec (decimal degrees)
+  - `48.557489`
+  - `+48.557489`
+  - `-39.298358`
 
-`StringToPoint(lat, lon)` accepts latitude and longitude in the same format class:
+## Public API
 
-- DMS with DMS,
-- MinDec with MinDec,
-- DegDec with DegDec.
+- Parse coordinate:
+  - `ParseCoord(s string) (Coord, error)`
+- Parse point:
+  - `ParsePoint(s string) (Point, error)`
+- Format coordinate by example:
+  - `Coord.Format(example string) (string, error)`
+- Format point by examples:
+  - `Point.Format(latFmt, lonFmt, separator string) (string, error)`
+- Default string views:
+  - `Coord.String() string`
+  - `Point.String() string`
 
-Exact textual representation may differ inside one class (for example,
-`48-33-27N` and `120-5749E` are both treated as DMS and are accepted together).
+Deprecated wrappers are still available:
+- `StringToCoord`
+- `StringToPoint`
 
-### Installation
+## Notes
 
-Once you have [installed Go][golang-install], run this command
-to install the `geoc` package:
+- `ParsePoint` expects latitude and longitude in compatible format classes:
+  - DMS with DMS
+  - MinDec with MinDec
+  - DegDec with DegDec
+- Exact textual representation inside one class may differ.
+  - Example: `48-33-27N` and `120-5749E` are both DMS and can be parsed together.
 
-    go get github.com/o-kos/geoc
+## Examples
 
-[golang-install]: http://golang.org/doc/install.html
+See runnable examples in `example_test.go`:
+- `ExampleParseCoord`
+- `ExampleParsePoint`
+- `ExampleCoord_Format`
+- `ExampleCoord_String`
+- `ExamplePoint_Format`
+- `ExamplePoint_String`
