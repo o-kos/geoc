@@ -1,6 +1,7 @@
 package geoc
 
 import (
+	"errors"
 	"math"
 	"testing"
 )
@@ -69,31 +70,35 @@ func TestStringToCoord(t *testing.T) {
 
 func TestStringToPoint(t *testing.T) {
 	testCases := []struct {
-		input         string
-		expectedLat   float64
-		expectedLon   float64
-		expectedError bool
+		input       string
+		expectedLat float64
+		expectedLon float64
+		expectedErr error
 	}{
 		// Positive cases
-		{`48-33N; 048-33.0E`, 48.55, 48.55, false},
-		{`48-3327N; 120-5749E`, 48.5575, 120.963611, false},
-		{`48-33-27N; 120-5749E`, 48.5575, 120.963611, false},
-		{`48°33'26,9604"N; 48-33-26.9604E`, 48.557489, 48.557489, false},
-		{`48°33'27"N; 48-33-27 E`, 48.5575, 48.5575, false},
-		{`48-33,00'N; 48°33'E`, 48.55, 48.55, false},
+		{`48-33N; 048-33.0E`, 48.55, 48.55, nil},
+		{`48-3327N; 120-5749E`, 48.5575, 120.963611, nil},
+		{`48-33-27N; 120-5749E`, 48.5575, 120.963611, nil},
+		{`48°33'26,9604"N; 48-33-26.9604E`, 48.557489, 48.557489, nil},
+		{`48°33'27"N; 48-33-27 E`, 48.5575, 48.5575, nil},
+		{`48-33,00'N; 48°33'E`, 48.55, 48.55, nil},
 
 		// Negative cases
-		{`48N; 48N`, 0, 0, true},
-		{`48-3327N; 120-5760E`, 0, 0, true},
-		{`48-3327N; 48°33.4493'E`, 0, 0, true},
-		{`48-33'N; 48.557489`, 0, 0, true},
+		{`48N; 48N`, 0, 0, ErrInvalidString},
+		{`48-3327N; 120-5760E`, 0, 0, ErrOutOfRange},
+		{`48-3327N; 48°33.4493'E`, 0, 0, ErrInvalidString},
+		{`48-33'N; 48.557489`, 0, 0, ErrInvalidString},
 	}
 
 	for _, tc := range testCases {
 		point, err := ParsePoint(tc.input)
-		if tc.expectedError {
+		if tc.expectedErr != nil {
 			if err == nil {
 				t.Errorf("Expected error for %q string, got nil", tc.input)
+				continue
+			}
+			if !errors.Is(err, tc.expectedErr) {
+				t.Errorf("For %q: expected error %q, got %q", tc.input, tc.expectedErr, err)
 			}
 		} else {
 			if err != nil {
@@ -116,32 +121,32 @@ func TestCoordToString(t *testing.T) {
 		coord         string
 		example       string
 		expected      string // empty if equal to example
-		expectedError error
+		expectedError bool
 	}{
 		// DMS formats
-		{`48-33.27N`, `48°33'27"N`, "", nil},
-		{`48-33.269604E`, `48°33'26.9604"E`, "", nil},
-		{`48-55.7489N`, `48°33'26,9604"N`, "", nil},
-		{`48-55.7489N`, `48-33-27N`, "", nil},
-		{`48-55.7489N`, `48-33-27 N`, "", nil},
-		{`120-5749E`, `120-5749E`, "", nil},
+		{`48-33.27N`, `48°33'27"N`, "", false},
+		{`48-33.269604E`, `48°33'26.9604"E`, "", false},
+		{`48-55.7489N`, `48°33'26,9604"N`, "", false},
+		{`48-55.7489N`, `48-33-27N`, "", false},
+		{`48-55.7489N`, `48-33-27 N`, "", false},
+		{`120-5749E`, `120-5749E`, "", false},
 
 		// Negative coord flips location letter
-		{`-48.557489`, `48°33'27"N`, `48°33'27"S`, nil},
-		{`-120.963611`, `120°57'49"E`, `120°57'49"W`, nil},
+		{`-48.557489`, `48°33'27"N`, `48°33'27"S`, false},
+		{`-120.963611`, `120°57'49"E`, `120°57'49"W`, false},
 
 		// MinDec formats
-		{`48.557489`, `48°33.4493'N`, "", nil},
-		{`48.55`, `48°33'N`, "", nil},
-		{`48.55`, `48-33N`, "", nil},
+		{`48.557489`, `48°33.4493'N`, "", false},
+		{`48.55`, `48°33'N`, "", false},
+		{`48.55`, `48-33N`, "", false},
 
 		// DegDec formats
-		{`48.557489`, `48.557489`, "", nil},
-		{`48.557489`, `48,557489`, "", nil},
-		{`-48.557489`, `-48.557489`, "", nil},
-		{`48.0`, `48N`, "", nil},
-		{`48.0`, `48 N`, "", nil},
-		{`48.0`, `48`, "", nil},
+		{`48.557489`, `48.557489`, "", false},
+		{`48.557489`, `48,557489`, "", false},
+		{`-48.557489`, `-48.557489`, "", false},
+		{`48.0`, `48N`, "", false},
+		{`48.0`, `48 N`, "", false},
+		{`48.0`, `48`, "", false},
 
 		// Negative cases
 		{`48.0`, `invalid`, "", true},
@@ -150,18 +155,27 @@ func TestCoordToString(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result, err := Format(tc.coord, tc.example)
+		coord, err := ParseCoord(tc.coord)
+		if err != nil {
+			t.Errorf("Failed to parse coord %q: %v", tc.coord, err)
+			continue
+		}
+		result, err := coord.Format(tc.example)
 		if tc.expectedError {
 			if err == nil {
-				t.Errorf("Expected error for coord=%f, example=%q, got nil", tc.coord, tc.example)
+				t.Errorf("Expected error for coord=%q, example=%q, got nil", tc.coord, tc.example)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("Error %v for coord=%f, example=%q", err, tc.coord, tc.example)
+				t.Errorf("Error %v for coord=%q, example=%q", err, tc.coord, tc.example)
 				continue
 			}
-			if result != tc.expectedStr {
-				t.Errorf("For coord=%f, example=%q: expected %q, got %q", tc.coord, tc.example, tc.expectedStr, result)
+			expected := tc.expected
+			if expected == "" {
+				expected = tc.example
+			}
+			if result != expected {
+				t.Errorf("For coord=%q, example=%q: expected %q, got %q", tc.coord, tc.example, expected, result)
 			}
 		}
 	}
@@ -219,28 +233,31 @@ func TestParseCoord(t *testing.T) {
 
 func TestParsePoint(t *testing.T) {
 	testCases := []struct {
-		input         string
-		expectedLat   float64
-		expectedLon   float64
-		expectedError bool
+		input       string
+		expectedLat float64
+		expectedLon float64
+		expectedErr error
 	}{
 		// Positive cases
-		{`48-33-27N; 120-5749E`, 48.5575, 120.963611, false},
-		{`48-33N; 048-33.0E`, 48.55, 48.55, false},
-		{`48°33'26,9604"N; 48-33-26.9604E`, 48.557489, 48.557489, false},
-		{`48-33-27N 120-5749E`, 48.5575, 120.963611, false}, // no explicit separator
+		{`48-33-27N; 120-5749E`, 48.5575, 120.963611, nil},
+		{`48-33N; 048-33.0E`, 48.55, 48.55, nil},
+		{`48°33'26,9604"N; 48-33-26.9604E`, 48.557489, 48.557489, nil},
+		{`48-33-27N 120-5749E`, 48.5575, 120.963611, nil},
 
 		// Negative cases
-		{`48N; 48N`, 0, 0, true},               // both lat
-		{`48-3327N; 48°33.4493'E`, 0, 0, true}, // format mismatch
-		{`invalid`, 0, 0, true},
+		{`48N; 48N`, 0, 0, ErrOutOfRange},               // both lat
+		{`48-3327N; 48°33.4493'E`, 0, 0, ErrOutOfRange}, // format mismatch
+		{`invalid`, 0, 0, ErrOutOfRange},
 	}
 
 	for _, tc := range testCases {
 		point, err := ParsePoint(tc.input)
-		if tc.expectedError {
+		if tc.expectedErr != nil {
 			if err == nil {
 				t.Errorf("Expected error for %q, got nil", tc.input)
+			}
+			if !errors.Is(err, tc.expectedErr) {
+				t.Errorf("For %q: expected error %v, got %v", tc.input, tc.expectedErr, err)
 			}
 		} else {
 			if err != nil {
