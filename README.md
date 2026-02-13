@@ -39,6 +39,7 @@ go get github.com/o-kos/geoc
   - `Point.String() string`
 
 Deprecated wrappers are still available:
+
 - `StringToCoord`
 - `StringToPoint`
 
@@ -54,6 +55,7 @@ Deprecated wrappers are still available:
 ## Examples
 
 See runnable examples in `example_test.go`:
+
 - `ExampleParseCoord`
 - `ExampleParsePoint`
 - `ExampleCoord_Format`

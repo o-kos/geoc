@@ -90,9 +90,7 @@ func (c Coord) Format(example string) (string, error) {
 
 	negative := c.Value < 0
 
-	// Detect compact format (e.g., 120-5749E): 4 integer digits in minutes
-	isCompact := len(cg.min) == 4 && cg.sec == "" && cg.loc != "" && strings.IndexAny(cg.min, ".,") == -1
-	hasSec := cg.sec != "" || isCompact
+	hasSec := cg.sec != ""
 	hasMin := cg.min != ""
 
 	// Detect decimal separator and precision from the most specific component
@@ -104,9 +102,9 @@ func (c Coord) Format(example string) (string, error) {
 			precision = len(s) - idx - 1
 		}
 	}
-	if hasSec && !isCompact {
+	if hasSec && !cg.compact {
 		detectDecimal(cg.sec)
-	} else if hasMin && !isCompact {
+	} else if hasMin && !cg.compact {
 		detectDecimal(cg.min)
 	} else if !hasMin {
 		detectDecimal(cg.deg)
@@ -172,7 +170,7 @@ func (c Coord) Format(example string) (string, error) {
 	minutes := math.Floor(totalMin)
 	sec := (totalMin - minutes) * 60
 
-	if isCompact {
+	if cg.compact {
 		return degStr + cg.sep.deg + fmt.Sprintf("%02.0f", minutes) + fmt.Sprintf("%02.0f", sec) + locLetter, nil
 	}
 
@@ -266,17 +264,28 @@ func (p Point) String() string {
 }
 
 type coordGroups struct {
-	sgn string
-	deg string
-	min string
-	sec string
-	loc string
-	sep struct {
+	sgn     string
+	deg     string
+	min     string
+	sec     string
+	loc     string
+	compact bool
+	sep     struct {
 		deg string
 		min string
 		sec string
 	}
-	fmt string
+}
+
+// normalizeCompact splits compact MMSS minutes (e.g., "5749")
+// into separate min ("57") and sec ("49") fields.
+func (cg *coordGroups) normalizeCompact() {
+	if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" &&
+		strings.IndexAny(cg.min, ".,") == -1 {
+		cg.compact = true
+		cg.sec = cg.min[2:]
+		cg.min = cg.min[:2]
+	}
 }
 
 type formatClass int
@@ -367,6 +376,7 @@ func newCoordGroups(cs string) (coordGroups, error) {
 		return cg, fmt.Errorf("%w: extra characters detected", ErrInvalidString)
 	}
 
+	cg.normalizeCompact()
 	return cg, nil
 }
 
@@ -396,6 +406,8 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLat, _ = coordGroupsFromMatch(m[0], sen)
 	cgLon, _ = coordGroupsFromMatch(m[1], sen)
 
+	cgLat.normalizeCompact()
+	cgLon.normalizeCompact()
 	return cgLat, cgLon, nil
 }
 
@@ -435,7 +447,6 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 		return 0, fmt.Errorf("%w: missing degrees", ErrInvalidCoord)
 	}
 
-	cg.fmt = "d"
 	// Check float degrees & exists minutes/seconds
 	idx := strings.IndexAny(cg.deg, ".,")
 	if idx != -1 && (cg.min != "" || cg.sec != "") {
@@ -444,8 +455,6 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 	if idx != -1 {
 		cg.deg = cg.deg[:idx] + "." + cg.deg[idx+1:]
 	}
-	cg.fmt += cg.sep.deg
-
 	if degrees, err := strconv.ParseFloat(cg.deg, 64); err == nil {
 		limit := 180.0
 		if cg.loc == "S" || cg.loc == "N" || loc == Lat {
@@ -465,20 +474,13 @@ func (cg *coordGroups) getMinutes() (float64, error) {
 		return 0, nil
 	}
 
-	cg.fmt += "m"
 	idx := strings.IndexAny(cg.min, ".,")
 	if idx != -1 && cg.sec != "" {
 		return 0, fmt.Errorf("%w: minutes with decimal and seconds", ErrInvalidCoord)
 	}
 	if idx != -1 {
 		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
-	} else { // 48-3327N format
-		if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" {
-			cg.sec = cg.min[2:]
-			cg.min = cg.min[:2]
-		}
 	}
-	cg.fmt += cg.sep.min
 
 	if minutes, err := strconv.ParseFloat(cg.min, 64); err == nil {
 		return checkLimits(minutes, 60, "minutes")
@@ -492,12 +494,10 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 		return 0, nil
 	}
 
-	cg.fmt += "s"
 	idx := strings.IndexAny(cg.sec, ".,")
 	if idx != -1 {
 		cg.sec = cg.sec[:idx] + "." + cg.sec[idx+1:]
 	}
-	cg.fmt += cg.sep.sec
 
 	if seconds, err := strconv.ParseFloat(cg.sec, 64); err == nil {
 		return checkLimits(seconds, 60, "seconds")
@@ -527,10 +527,6 @@ func (cg *coordGroups) getCoord() (Coord, error) {
 	if err != nil {
 		return coord, err
 	}
-	if cg.loc != "" {
-		cg.fmt += "l"
-	}
-
 	coord.Value = deg + minutes/60 + sec/3600
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
 		coord.Value = -coord.Value
