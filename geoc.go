@@ -444,6 +444,8 @@ func (cg *coordGroups) getCoord() (Coord, error) {
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
 		coord.Value = -coord.Value
 	}
+	coord.Loc = loc
+
 	return coord, nil
 }
 
@@ -511,7 +513,7 @@ func ParsePoint(s string) (Point, error) {
 		return p, fmt.Errorf("%w in string %q", err, s)
 	}
 
-	if locLat, _ := cgLat.getLocation(); locLat != Lat {
+	if lat.Loc != Lat {
 		return p, fmt.Errorf("%w: bad latitude location in string %q", ErrInvalidString, s)
 	}
 
@@ -520,7 +522,7 @@ func ParsePoint(s string) (Point, error) {
 		return p, fmt.Errorf("%w in string %q", err, s)
 	}
 
-	if locLon, _ := cgLon.getLocation(); locLon != Lon {
+	if lon.Loc != Lon {
 		return p, fmt.Errorf("%w: bad longitude location in string %q", ErrInvalidString, s)
 	}
 
