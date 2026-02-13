@@ -452,10 +452,11 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 	if idx != -1 && (cg.min != "" || cg.sec != "") {
 		return 0, fmt.Errorf("%w: degrees with decimal and minutes", ErrInvalidCoord)
 	}
+	degStr := cg.deg
 	if idx != -1 {
-		cg.deg = cg.deg[:idx] + "." + cg.deg[idx+1:]
+		degStr = cg.deg[:idx] + "." + cg.deg[idx+1:]
 	}
-	if degrees, err := strconv.ParseFloat(cg.deg, 64); err == nil {
+	if degrees, err := strconv.ParseFloat(degStr, 64); err == nil {
 		limit := 180.0
 		if cg.loc == "S" || cg.loc == "N" || loc == LocLat {
 			limit = 90.0
@@ -466,7 +467,7 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 		return degrees, nil
 	}
 
-	return 0, fmt.Errorf("%w: bad degrees %q", ErrInvalidCoord, cg.deg)
+	return 0, fmt.Errorf("%w: bad degrees %q", ErrInvalidCoord, degStr)
 }
 
 func (cg *coordGroups) getMinutes() (float64, error) {
@@ -478,15 +479,16 @@ func (cg *coordGroups) getMinutes() (float64, error) {
 	if idx != -1 && cg.sec != "" {
 		return 0, fmt.Errorf("%w: minutes with decimal and seconds", ErrInvalidCoord)
 	}
+	minStr := cg.min
 	if idx != -1 {
-		cg.min = cg.min[:idx] + "." + cg.min[idx+1:]
+		minStr = cg.min[:idx] + "." + cg.min[idx+1:]
 	}
 
-	if minutes, err := strconv.ParseFloat(cg.min, 64); err == nil {
+	if minutes, err := strconv.ParseFloat(minStr, 64); err == nil {
 		return checkLimits(minutes, 60, "minutes")
 	}
 
-	return 0, fmt.Errorf("%w: bad minutes %q", ErrInvalidCoord, cg.min)
+	return 0, fmt.Errorf("%w: bad minutes %q", ErrInvalidCoord, minStr)
 }
 
 func (cg *coordGroups) getSeconds() (float64, error) {
@@ -495,15 +497,16 @@ func (cg *coordGroups) getSeconds() (float64, error) {
 	}
 
 	idx := strings.IndexAny(cg.sec, ".,")
+	secStr := cg.sec
 	if idx != -1 {
-		cg.sec = cg.sec[:idx] + "." + cg.sec[idx+1:]
+		secStr = cg.sec[:idx] + "." + cg.sec[idx+1:]
 	}
 
-	if seconds, err := strconv.ParseFloat(cg.sec, 64); err == nil {
+	if seconds, err := strconv.ParseFloat(secStr, 64); err == nil {
 		return checkLimits(seconds, 60, "seconds")
 	}
 
-	return 0, fmt.Errorf("%w: bad seconds %q", ErrInvalidCoord, cg.sec)
+	return 0, fmt.Errorf("%w: bad seconds %q", ErrInvalidCoord, secStr)
 }
 
 func (cg *coordGroups) getCoord() (Coord, error) {
