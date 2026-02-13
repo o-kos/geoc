@@ -1,16 +1,16 @@
 # Changelog
 
-## [0.2.1] by 2026-02-13
+## [0.2.0] by 2026-02-13
 
 ### Added
 
 - New functions:
   - `ParseCoord`
-  - `ParsePoint` 
+  - `ParsePoint`
   - `Coord.Format`
   - `Coord.String`
   - `Point.Format`
-  - `Point.String` 
+  - `Point.String`
 - New table-driven tests for:
   - `Coord.Format` (split into positive and negative scenarios)
   - `Point.Format`

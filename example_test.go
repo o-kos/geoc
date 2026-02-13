@@ -25,7 +25,7 @@ func ExampleParsePoint() {
 }
 
 func ExampleCoord_Format() {
-	c := Coord{Value: -48.5575, Loc: Lat}
+	c := Coord{Value: -48.5575, Loc: LocLat}
 	s, err := c.Format(`48°33'27"N`)
 	if err != nil {
 		fmt.Println("error:", err)
@@ -37,7 +37,7 @@ func ExampleCoord_Format() {
 }
 
 func ExampleCoord_String() {
-	fmt.Println(Coord{Value: 48.5575, Loc: Lat}.String())
+	fmt.Println(Coord{Value: 48.5575, Loc: LocLat}.String())
 	// Output:
 	// 48-33.4N
 }
@@ -60,8 +60,8 @@ func ExamplePoint_Format() {
 
 func ExamplePoint_String() {
 	p := Point{
-		Lat: Coord{Value: 48.5575, Loc: Lat},
-		Lon: Coord{Value: 120.963611, Loc: Lon},
+		Lat: Coord{Value: 48.5575, Loc: LocLat},
+		Lon: Coord{Value: 120.963611, Loc: LocLon},
 	}
 	fmt.Println(p.String())
 	// Output:

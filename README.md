@@ -37,6 +37,8 @@ go get github.com/o-kos/geoc
 - Default string views:
   - `Coord.String() string`
   - `Point.String() string`
+- Location enum:
+  - `LocNone`, `LocLat`, `LocLon`
 
 Deprecated wrappers are still available:
 
@@ -51,6 +53,12 @@ Deprecated wrappers are still available:
   - DegDec with DegDec
 - Exact textual representation inside one class may differ.
   - Example: `48-33-27N` and `120-5749E` are both DMS and can be parsed together.
+- `Coord.String()` uses defaults:
+  - latitude: `48-33.0N`
+  - longitude: `048-33.0E`
+  - unspecified location: decimal degrees
+- `Point.String()` uses `48-33.0N 048-33.0E`; if formatting fails, it falls back to
+  `p.Lat.String() + " " + p.Lon.String()`.
 
 ## Examples
 

@@ -13,16 +13,16 @@ import (
 type Location int
 
 const (
-	None Location = iota // None means location type is not specified.
-	Lat                  // Lat means coordinate is latitude.
-	Lon                  // Lon means coordinate is longitude.
+	LocNone Location = iota // LocNone means location type is not specified.
+	LocLat                  // LocLat means coordinate is latitude.
+	LocLon                  // LocLon means coordinate is longitude.
 )
 
 func (l Location) String() string {
 	switch l {
-	case Lat:
+	case LocLat:
 		return "Lat"
-	case Lon:
+	case LocLon:
 		return "Lon"
 	default:
 		return "None"
@@ -82,20 +82,20 @@ func (c Coord) Format(example string) (string, error) {
 
 	// Use Coord's Loc if set, otherwise derive from example
 	loc := c.Loc
-	if loc == None {
+	if loc == LocNone {
 		if cg.loc == "N" || cg.loc == "S" {
-			loc = Lat
+			loc = LocLat
 		} else if cg.loc == "E" || cg.loc == "W" {
-			loc = Lon
+			loc = LocLon
 		}
 	}
 
 	// Validate coord bounds
 	absCoord := math.Abs(c.Value)
-	if loc == Lat && absCoord > 90 {
+	if loc == LocLat && absCoord > 90 {
 		return "", fmt.Errorf("%w: latitude %f", ErrOutOfRange, c.Value)
 	}
-	if loc == Lon && absCoord > 180 {
+	if loc == LocLon && absCoord > 180 {
 		return "", fmt.Errorf("%w: longitude %f", ErrOutOfRange, c.Value)
 	}
 
@@ -130,7 +130,7 @@ func (c Coord) Format(example string) (string, error) {
 	// Determine output location letter
 	locLetter := ""
 	if cg.loc != "" {
-		if loc == Lat {
+		if loc == LocLat {
 			locLetter = "N"
 			if negative {
 				locLetter = "S"
@@ -199,9 +199,9 @@ func (c Coord) Format(example string) (string, error) {
 func (c Coord) String() string {
 	var example string
 	switch c.Loc {
-	case Lat:
+	case LocLat:
 		example = "48-33.0N"
-	case Lon:
+	case LocLon:
 		example = "048-33.0E"
 	default:
 		example = "48.557489"
@@ -229,7 +229,7 @@ func ParsePoint(s string) (Point, error) {
 		return p, fmt.Errorf("%w in string %q", err, s)
 	}
 
-	if lat.Loc != Lat {
+	if lat.Loc != LocLat {
 		return p, fmt.Errorf("%w: bad latitude location in string %q", ErrInvalidString, s)
 	}
 
@@ -238,7 +238,7 @@ func ParsePoint(s string) (Point, error) {
 		return p, fmt.Errorf("%w in string %q", err, s)
 	}
 
-	if lon.Loc != Lon {
+	if lon.Loc != LocLon {
 		return p, fmt.Errorf("%w: bad longitude location in string %q", ErrInvalidString, s)
 	}
 
@@ -265,11 +265,11 @@ func (p Point) Format(latFmt, lonFmt, separator string) (string, error) {
 
 // String returns default string representation of the point.
 // Default format is "48-33.0N 048-33.0E".
-// If formatting fails, empty string is returned.
+// If formatting fails, falls back to individual coordinate strings.
 func (p Point) String() string {
 	s, err := p.Format("48-33.0N", "048-33.0E", " ")
 	if err != nil {
-		return ""
+		return p.Lat.String() + " " + p.Lon.String()
 	}
 	return s
 }
@@ -413,16 +413,16 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 
 func (cg *coordGroups) getLocation() (Location, error) {
 	if cg.loc == "N" || cg.loc == "S" {
-		return Lat, nil
+		return LocLat, nil
 	}
 	if cg.loc == "E" || cg.loc == "W" {
-		return Lon, nil
+		return LocLon, nil
 	}
 	if cg.loc == "" {
-		return None, nil
+		return LocNone, nil
 	}
 
-	return None, fmt.Errorf("%w: bad location sign %q", ErrInvalidCoord, cg.loc)
+	return LocNone, fmt.Errorf("%w: bad location sign %q", ErrInvalidCoord, cg.loc)
 }
 
 func (cg *coordGroups) checkSign() error {
@@ -457,7 +457,7 @@ func (cg *coordGroups) getDegrees(loc Location) (float64, error) {
 	}
 	if degrees, err := strconv.ParseFloat(cg.deg, 64); err == nil {
 		limit := 180.0
-		if cg.loc == "S" || cg.loc == "N" || loc == Lat {
+		if cg.loc == "S" || cg.loc == "N" || loc == LocLat {
 			limit = 90.0
 		}
 		if degrees > limit {

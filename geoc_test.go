@@ -39,19 +39,19 @@ func TestCoordFormatPositive(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		coord, err := ParseCoord(tc.coord)
-		if err != nil {
-			t.Errorf("Failed to parse coord %q: %v", tc.coord, err)
-			continue
-		}
-		result, err := coord.Format(tc.example)
-		if err != nil {
-			t.Errorf("Error %v for coord=%q, example=%q", err, tc.coord, tc.example)
-			continue
-		}
-		if result != tc.expected {
-			t.Errorf("For coord=%q, example=%q: expected %q, got %q", tc.coord, tc.example, tc.expected, result)
-		}
+		t.Run(tc.coord+" → "+tc.example, func(t *testing.T) {
+			coord, err := ParseCoord(tc.coord)
+			if err != nil {
+				t.Fatalf("Failed to parse coord %q: %v", tc.coord, err)
+			}
+			result, err := coord.Format(tc.example)
+			if err != nil {
+				t.Fatalf("Error %v for coord=%q, example=%q", err, tc.coord, tc.example)
+			}
+			if result != tc.expected {
+				t.Fatalf("For coord=%q, example=%q: expected %q, got %q", tc.coord, tc.example, tc.expected, result)
+			}
+		})
 	}
 }
 
@@ -65,14 +65,15 @@ func TestCoordFormatNegative(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		coord, err := ParseCoord(tc.coord)
-		if err != nil {
-			t.Errorf("Failed to parse coord %q: %v", tc.coord, err)
-			continue
-		}
-		if _, err := coord.Format(tc.example); err == nil {
-			t.Errorf("Expected error for coord=%q, example=%q, got nil", tc.coord, tc.example)
-		}
+		t.Run(tc.coord+" "+tc.example, func(t *testing.T) {
+			coord, err := ParseCoord(tc.coord)
+			if err != nil {
+				t.Fatalf("Failed to parse coord %q: %v", tc.coord, err)
+			}
+			if _, err := coord.Format(tc.example); err == nil {
+				t.Fatalf("Expected error for coord=%q, example=%q, got nil", tc.coord, tc.example)
+			}
+		})
 	}
 }
 
@@ -84,42 +85,42 @@ func TestCoordString(t *testing.T) {
 	}{
 		{
 			name:     "lat_positive",
-			coord:    Coord{Value: 48.5575, Loc: Lat},
+			coord:    Coord{Value: 48.5575, Loc: LocLat},
 			expected: "48-33.4N",
 		},
 		{
 			name:     "lat_negative",
-			coord:    Coord{Value: -48.5575, Loc: Lat},
+			coord:    Coord{Value: -48.5575, Loc: LocLat},
 			expected: "48-33.4S",
 		},
 		{
 			name:     "lon_positive_with_three_digit_deg",
-			coord:    Coord{Value: 120.963611, Loc: Lon},
+			coord:    Coord{Value: 120.963611, Loc: LocLon},
 			expected: "120-57.8E",
 		},
 		{
 			name:     "lon_negative_with_three_digit_deg",
-			coord:    Coord{Value: -120.963611, Loc: Lon},
+			coord:    Coord{Value: -120.963611, Loc: LocLon},
 			expected: "120-57.8W",
 		},
 		{
 			name:     "none_uses_decimal_degrees",
-			coord:    Coord{Value: 48.557489, Loc: None},
+			coord:    Coord{Value: 48.557489, Loc: LocNone},
 			expected: "48.557489",
 		},
 		{
 			name:     "none_negative_uses_sign",
-			coord:    Coord{Value: -48.557489, Loc: None},
+			coord:    Coord{Value: -48.557489, Loc: LocNone},
 			expected: "-48.557489",
 		},
 		{
 			name:     "boundary_lat_90",
-			coord:    Coord{Value: 90, Loc: Lat},
+			coord:    Coord{Value: 90, Loc: LocLat},
 			expected: "90-0.0N",
 		},
 		{
 			name:     "boundary_lon_180",
-			coord:    Coord{Value: 180, Loc: Lon},
+			coord:    Coord{Value: 180, Loc: LocLon},
 			expected: "180-0.0E",
 		},
 	}
@@ -146,7 +147,7 @@ func TestPointFormat(t *testing.T) {
 	}{
 		{
 			name:      "dms_with_semicolon",
-			point:     Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:     Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			latFmt:    `48°33'27"N`,
 			lonFmt:    `120°57'49"E`,
 			separator: "; ",
@@ -154,7 +155,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:      "negative_flips_ns_we",
-			point:     Point{Lat: Coord{Value: -48.5575, Loc: Lat}, Lon: Coord{Value: -120.963611, Loc: Lon}},
+			point:     Point{Lat: Coord{Value: -48.5575, Loc: LocLat}, Lon: Coord{Value: -120.963611, Loc: LocLon}},
 			latFmt:    `48°33'27"N`,
 			lonFmt:    `120°57'49"E`,
 			separator: " ",
@@ -170,7 +171,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "invalid_lat_format",
-			point:       Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			latFmt:      `invalid`,
 			lonFmt:      `120°57'49"E`,
 			separator:   " ",
@@ -178,7 +179,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "invalid_lon_format",
-			point:       Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			latFmt:      `48°33'27"N`,
 			lonFmt:      `invalid`,
 			separator:   " ",
@@ -186,7 +187,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "lat_out_of_range",
-			point:       Point{Lat: Coord{Value: 90.1, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 90.1, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			latFmt:      `48°33'27"N`,
 			lonFmt:      `120°57'49"E`,
 			separator:   " ",
@@ -194,7 +195,7 @@ func TestPointFormat(t *testing.T) {
 		},
 		{
 			name:        "lon_out_of_range",
-			point:       Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 180.1, Loc: Lon}},
+			point:       Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 180.1, Loc: LocLon}},
 			latFmt:      `48°33'27"N`,
 			lonFmt:      `120°57'49"E`,
 			separator:   " ",
@@ -232,12 +233,12 @@ func TestPointString(t *testing.T) {
 	}{
 		{
 			name:     "default_positive",
-			point:    Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:    Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			expected: "48-33.4N 120-57.8E",
 		},
 		{
 			name:     "default_negative",
-			point:    Point{Lat: Coord{Value: -48.5575, Loc: Lat}, Lon: Coord{Value: -120.963611, Loc: Lon}},
+			point:    Point{Lat: Coord{Value: -48.5575, Loc: LocLat}, Lon: Coord{Value: -120.963611, Loc: LocLon}},
 			expected: "48-33.4S 120-57.8W",
 		},
 		{
@@ -247,12 +248,12 @@ func TestPointString(t *testing.T) {
 		},
 		{
 			name:     "boundary_lat_90",
-			point:    Point{Lat: Coord{Value: 90, Loc: Lat}, Lon: Coord{Value: 120.963611, Loc: Lon}},
+			point:    Point{Lat: Coord{Value: 90, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
 			expected: "90-0.0N 120-57.8E",
 		},
 		{
 			name:     "boundary_lon_180",
-			point:    Point{Lat: Coord{Value: 48.5575, Loc: Lat}, Lon: Coord{Value: 180, Loc: Lon}},
+			point:    Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 180, Loc: LocLon}},
 			expected: "48-33.4N 180-0.0E",
 		},
 	}
@@ -274,55 +275,56 @@ func TestParseCoordPositive(t *testing.T) {
 		expectedLoc   Location
 	}{
 		// DMS
-		{`48°33'26.9604"N`, 48.557489, Lat},
-		{`48°33'27"N`, 48.5575, Lat},
-		{`48-33-27N`, 48.5575, Lat},
-		{`48-33-27 N`, 48.5575, Lat},
-		{`48-3327N`, 48.5575, Lat},
-		{`48-33-26.9604N`, 48.557489, Lat},
-		{`120-5749E`, 120.963611, Lon},
-		{`48°33'26,9604"N`, 48.557489, Lat},
+		{`48°33'26.9604"N`, 48.557489, LocLat},
+		{`48°33'27"N`, 48.5575, LocLat},
+		{`48-33-27N`, 48.5575, LocLat},
+		{`48-33-27 N`, 48.5575, LocLat},
+		{`48-3327N`, 48.5575, LocLat},
+		{`48-33-26.9604N`, 48.557489, LocLat},
+		{`120-5749E`, 120.963611, LocLon},
+		{`48°33'26,9604"N`, 48.557489, LocLat},
 
 		// MinDec
-		{`48°33.4493'N`, 48.557488, Lat},
-		{`48-33.4493'N`, 48.557488, Lat},
-		{`48-33,00'N`, 48.55, Lat},
-		{`48°33'N`, 48.55, Lat},
-		{`48-33'N`, 48.55, Lat},
-		{`48-33N`, 48.55, Lat},
+		{`48°33.4493'N`, 48.557488, LocLat},
+		{`48-33.4493'N`, 48.557488, LocLat},
+		{`48-33,00'N`, 48.55, LocLat},
+		{`48°33'N`, 48.55, LocLat},
+		{`48-33'N`, 48.55, LocLat},
+		{`48-33N`, 48.55, LocLat},
 
 		// DegDec
-		{`48`, 48, None},
-		{`48.557489`, 48.557489, None},
-		{`48,557489`, 48.557489, None},
-		{`-48.557489`, -48.557489, None},
-		{`-48`, -48, None},
-		{`+48`, 48, None},
-		{`98`, 98, None},
-		{`48N`, 48, Lat},
-		{`48 N`, 48, Lat},
-		{`48  ° N`, 48, Lat},
-		{`98E`, 98, Lon},
+		{`48`, 48, LocNone},
+		{`48.557489`, 48.557489, LocNone},
+		{`48,557489`, 48.557489, LocNone},
+		{`-48.557489`, -48.557489, LocNone},
+		{`-48`, -48, LocNone},
+		{`+48`, 48, LocNone},
+		{`98`, 98, LocNone},
+		{`48N`, 48, LocLat},
+		{`48 N`, 48, LocLat},
+		{`48  ° N`, 48, LocLat},
+		{`98E`, 98, LocLon},
 
 		// Boundary values
-		{`90N`, 90, Lat},
-		{`90S`, -90, Lat},
-		{`180E`, 180, Lon},
-		{`180W`, -180, Lon},
+		{`90N`, 90, LocLat},
+		{`90S`, -90, LocLat},
+		{`180E`, 180, LocLon},
+		{`180W`, -180, LocLon},
 	}
 
 	for _, tc := range testCases {
-		coord, err := ParseCoord(tc.input)
-		if err != nil {
-			t.Errorf("Error %v for %q", err, tc.input)
-			continue
-		}
-		if math.Abs(coord.Value-tc.expectedCoord) > 0.000001 {
-			t.Errorf("For %q: expected %f, got %f", tc.input, tc.expectedCoord, coord.Value)
-		}
-		if coord.Loc != tc.expectedLoc {
-			t.Errorf("For %q: expected Loc=%d, got %d", tc.input, tc.expectedLoc, coord.Loc)
-		}
+		t.Run(tc.input, func(t *testing.T) {
+			coord, err := ParseCoord(tc.input)
+			if err != nil {
+				t.Fatalf("Error %v for %q", err, tc.input)
+			}
+			if math.Abs(coord.Value-tc.expectedCoord) > 0.000001 {
+				t.Fatalf("For %q: expected %f, got %f", tc.input, tc.expectedCoord, coord.Value)
+			}
+			if coord.Loc != tc.expectedLoc {
+				t.Fatalf("For %q: expected Loc=%v, got %v", tc.input, tc.expectedLoc, coord.Loc)
+			}
+		})
 	}
 }
 
@@ -343,14 +345,15 @@ func TestParseCoordNegative(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := ParseCoord(tc.input)
-		if err == nil {
-			t.Errorf("Expected error for %q, got nil", tc.input)
-			continue
-		}
-		if !errors.Is(err, tc.expectedError) {
-			t.Errorf("For %q: expected error %q, got %q", tc.input, tc.expectedError, err)
-		}
+		t.Run(tc.input, func(t *testing.T) {
+			_, err := ParseCoord(tc.input)
+			if err == nil {
+				t.Fatalf("Expected error for %q, got nil", tc.input)
+			}
+			if !errors.Is(err, tc.expectedError) {
+				t.Fatalf("For %q: expected error %q, got %q", tc.input, tc.expectedError, err)
+			}
+		})
 	}
 }
 
@@ -370,17 +373,18 @@ func TestParsePointPositive(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		point, err := ParsePoint(tc.input)
-		if err != nil {
-			t.Errorf("Error %v for %q", err, tc.input)
-			continue
-		}
-		if math.Abs(point.Lat.Value-tc.expectedLat) > 0.000001 {
-			t.Errorf("For %q: expected lat %f, got %f", tc.input, tc.expectedLat, point.Lat.Value)
-		}
-		if math.Abs(point.Lon.Value-tc.expectedLon) > 0.000001 {
-			t.Errorf("For %q: expected lon %f, got %f", tc.input, tc.expectedLon, point.Lon.Value)
-		}
+		t.Run(tc.input, func(t *testing.T) {
+			point, err := ParsePoint(tc.input)
+			if err != nil {
+				t.Fatalf("Error %v for %q", err, tc.input)
+			}
+			if math.Abs(point.Lat.Value-tc.expectedLat) > 0.000001 {
+				t.Fatalf("For %q: expected lat %f, got %f", tc.input, tc.expectedLat, point.Lat.Value)
+			}
+			if math.Abs(point.Lon.Value-tc.expectedLon) > 0.000001 {
+				t.Fatalf("For %q: expected lon %f, got %f", tc.input, tc.expectedLon, point.Lon.Value)
+			}
+		})
 	}
 }
 
@@ -401,13 +405,15 @@ func TestParsePointNegative(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := ParsePoint(tc.input)
-		if err == nil {
-			t.Errorf("Expected error for %q, got nil", tc.input)
-		}
-		if !errors.Is(err, tc.expectedErr) {
-			t.Errorf("For %q: expected error %q, got %q", tc.input, tc.expectedErr, err)
-		}
+		t.Run(tc.input, func(t *testing.T) {
+			_, err := ParsePoint(tc.input)
+			if err == nil {
+				t.Fatalf("Expected error for %q, got nil", tc.input)
+			}
+			if !errors.Is(err, tc.expectedErr) {
+				t.Fatalf("For %q: expected error %q, got %q", tc.input, tc.expectedErr, err)
+			}
+		})
 	}
 }
 
@@ -429,7 +435,7 @@ func TestCoordGroupsErrorBranches(t *testing.T) {
 
 	t.Run("getDegrees_missing_degrees", func(t *testing.T) {
 		cg := coordGroups{}
-		_, err := cg.getDegrees(None)
+		_, err := cg.getDegrees(LocNone)
 		if err == nil || !errors.Is(err, ErrInvalidCoord) {
 			t.Fatalf("Expected ErrInvalidCoord, got %v", err)
 		}
@@ -437,7 +443,7 @@ func TestCoordGroupsErrorBranches(t *testing.T) {
 
 	t.Run("getDegrees_decimal_with_minutes", func(t *testing.T) {
 		cg := coordGroups{deg: "48.5", min: "30"}
-		_, err := cg.getDegrees(None)
+		_, err := cg.getDegrees(LocNone)
 		if err == nil || !errors.Is(err, ErrInvalidCoord) {
 			t.Fatalf("Expected ErrInvalidCoord, got %v", err)
 		}
@@ -445,7 +451,7 @@ func TestCoordGroupsErrorBranches(t *testing.T) {
 
 	t.Run("getDegrees_bad_degrees", func(t *testing.T) {
 		cg := coordGroups{deg: "abc"}
-		_, err := cg.getDegrees(None)
+		_, err := cg.getDegrees(LocNone)
 		if err == nil || !errors.Is(err, ErrInvalidCoord) {
 			t.Fatalf("Expected ErrInvalidCoord, got %v", err)
 		}
