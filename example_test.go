@@ -10,7 +10,7 @@ func ExampleParseCoord() {
 	}
 	fmt.Printf("%.4f %v\n", c.Value, c.Loc)
 	// Output:
-	// 48.5575 1
+	// 48.5575 Lat
 }
 
 func ExampleParsePoint() {

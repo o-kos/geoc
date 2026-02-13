@@ -18,6 +18,17 @@ const (
 	Lon                  // Lon means coordinate is longitude.
 )
 
+func (l Location) String() string {
+	switch l {
+	case Lat:
+		return "Lat"
+	case Lon:
+		return "Lon"
+	default:
+		return "None"
+	}
+}
+
 // Coord represents a geographic coordinate with its location type.
 type Coord struct {
 	Value float64
