@@ -316,7 +316,7 @@ type coordGroups struct {
 // into separate min ("57") and sec ("49") fields.
 func (cg *coordGroups) normalizeCompact() {
 	if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" &&
-		strings.IndexAny(cg.min, ".,") == -1 {
+		!strings.ContainsAny(cg.min, ".,") {
 		cg.compact = true
 		cg.sec = cg.min[2:]
 		cg.min = cg.min[:2]
