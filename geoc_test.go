@@ -19,6 +19,9 @@ func TestCoordFormatPositive(t *testing.T) {
 		{`48-55.7489N`, `48-33-27N`, `48-55-45N`},
 		{`48-55.7489N`, `48-33-27 N`, `48-55-45 N`},
 		{`120-5749E`, `120-5749E`, `120-5749E`},
+		{`12.9999999`, `012-5749E`, `013-0000E`},
+		{`48.05`, `48°03'04"N`, `48°03'00"N`},
+		{`48.999999`, `48°33'27"N`, `49°00'00"N`},
 
 		// Negative coord flips location letter
 		{`-48.557489`, `48°33'27"N`, `48°33'27"S`},
@@ -28,6 +31,10 @@ func TestCoordFormatPositive(t *testing.T) {
 		{`48.557489`, `48°33.4493'N`, `48°33.4493'N`},
 		{`48.55`, `48°33'N`, `48°33'N`},
 		{`48.55`, `48-33N`, `48-33N`},
+		{`48.05`, `48-03.0N`, `48-03.0N`},
+		{`48.999999`, `48-33.0N`, `49-00.0N`},
+		{`179.9999999`, `180-00.0E`, `180-00.0E`},
+		{`89.9999999`, `90-00.0N`, `90-00.0N`},
 
 		// DegDec formats
 		{`48.557489`, `48.557489`, `48.557489`},
@@ -116,12 +123,12 @@ func TestCoordString(t *testing.T) {
 		{
 			name:     "boundary_lat_90",
 			coord:    Coord{Value: 90, Loc: LocLat},
-			expected: "90-0.0N",
+			expected: "90-00.0N",
 		},
 		{
 			name:     "boundary_lon_180",
 			coord:    Coord{Value: 180, Loc: LocLon},
-			expected: "180-0.0E",
+			expected: "180-00.0E",
 		},
 	}
 
@@ -249,12 +256,12 @@ func TestPointString(t *testing.T) {
 		{
 			name:     "boundary_lat_90",
 			point:    Point{Lat: Coord{Value: 90, Loc: LocLat}, Lon: Coord{Value: 120.963611, Loc: LocLon}},
-			expected: "90-0.0N 120-57.8E",
+			expected: "90-00.0N 120-57.8E",
 		},
 		{
 			name:     "boundary_lon_180",
 			point:    Point{Lat: Coord{Value: 48.5575, Loc: LocLat}, Lon: Coord{Value: 180, Loc: LocLon}},
-			expected: "48-33.4N 180-0.0E",
+			expected: "48-33.4N 180-00.0E",
 		},
 	}
 
@@ -335,6 +342,8 @@ func TestParseCoordNegative(t *testing.T) {
 	}{
 		{`98N`, ErrOutOfRange},
 		{`120-5760E`, ErrOutOfRange},
+		{`90-01N`, ErrOutOfRange},
+		{`180-01E`, ErrOutOfRange},
 		{`48"N`, ErrInvalidString},
 		{`48'N`, ErrInvalidString},
 		{`-48N`, ErrInvalidCoord},
@@ -370,6 +379,8 @@ func TestParsePointPositive(t *testing.T) {
 		{`48°33'27"N; 48-33-27 E`, 48.5575, 48.5575},
 		{`48-33,00'N; 48°33'E`, 48.55, 48.55},
 		{`48-33-27N 120-5749E`, 48.5575, 120.963611},
+		{`48N120E`, 48, 120},
+		{` 48N;120E `, 48, 120},
 	}
 
 	for _, tc := range testCases {
@@ -401,6 +412,10 @@ func TestParsePointNegative(t *testing.T) {
 		{`48N; 48N`, ErrInvalidString},               // both lat
 		{`48-3327N; 48°33.4493'E`, ErrInvalidString}, // format mismatch
 		{`48-33'N; 48.557489`, ErrInvalidString},
+		{`abc 48N 120E`, ErrInvalidString},
+		{`x48N;120E`, ErrInvalidString},
+		{`48N xxx 120E`, ErrInvalidString},
+		{`48N;120Ezzz`, ErrInvalidString},
 		{`invalid`, ErrInvalidString},
 	}
 

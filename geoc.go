@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type Location int
@@ -121,11 +122,34 @@ func (c Coord) Format(example string) (string, error) {
 		detectDecimal(cg.deg)
 	}
 
-	// Detect degree width for zero-padding (e.g., "048" → width 3)
-	degWidth := len(cg.deg)
-	if idx := strings.IndexAny(cg.deg, ".,"); idx != -1 {
-		degWidth = idx
+	// Detect component widths for zero-padding.
+	componentIntWidth := func(s string) int {
+		if idx := strings.IndexAny(s, ".,"); idx != -1 {
+			return idx
+		}
+		return len(s)
 	}
+	formatFixed := func(value float64, intWidth, fracPrecision int) string {
+		var out string
+		if fracPrecision > 0 {
+			totalWidth := intWidth + 1 + fracPrecision
+			out = fmt.Sprintf("%0*.*f", totalWidth, fracPrecision, value)
+		} else {
+			out = fmt.Sprintf("%0*.0f", intWidth, value)
+		}
+		if decSep == "," {
+			out = strings.Replace(out, ".", ",", 1)
+		}
+		return out
+	}
+	roundWithPrecision := func(value float64, fracPrecision int) float64 {
+		scale := math.Pow(10, float64(fracPrecision))
+		return math.Round(value*scale) / scale
+	}
+
+	degWidth := componentIntWidth(cg.deg)
+	minWidth := componentIntWidth(cg.min)
+	secWidth := componentIntWidth(cg.sec)
 
 	// Determine output location letter
 	locLetter := ""
@@ -145,16 +169,7 @@ func (c Coord) Format(example string) (string, error) {
 
 	// DegDec format
 	if !hasMin {
-		var degStr string
-		if precision > 0 {
-			totalWidth := degWidth + 1 + precision
-			degStr = fmt.Sprintf("%0*.*f", totalWidth, precision, absCoord)
-		} else {
-			degStr = fmt.Sprintf("%0*.0f", degWidth, absCoord)
-		}
-		if decSep == "," {
-			degStr = strings.Replace(degStr, ".", ",", 1)
-		}
+		degStr := formatFixed(absCoord, degWidth, precision)
 		if negative && cg.loc == "" {
 			degStr = "-" + degStr
 		} else if cg.sgn == "+" {
@@ -164,32 +179,37 @@ func (c Coord) Format(example string) (string, error) {
 	}
 
 	deg := math.Floor(absCoord)
-	degStr := fmt.Sprintf("%0*.0f", degWidth, deg)
 
 	// MinDec format
 	if !hasSec {
-		minutes := (absCoord - deg) * 60
-		minStr := fmt.Sprintf("%.*f", precision, minutes)
-		if decSep == "," {
-			minStr = strings.Replace(minStr, ".", ",", 1)
+		minutes := roundWithPrecision((absCoord-deg)*60, precision)
+		if minutes >= 60 {
+			minutes = 0
+			deg++
 		}
+		degStr := fmt.Sprintf("%0*.0f", degWidth, deg)
+		minStr := formatFixed(minutes, minWidth, precision)
 		return degStr + cg.sep.deg + minStr + cg.sep.min + locLetter, nil
 	}
 
 	// DMS format
-	totalMin := (absCoord - deg) * 60
-	minutes := math.Floor(totalMin)
-	sec := (totalMin - minutes) * 60
+	totalSec := roundWithPrecision((absCoord-deg)*3600, precision)
+	if totalSec >= 3600 {
+		totalSec = 0
+		deg++
+	}
+	minutes := math.Floor(totalSec / 60)
+	sec := totalSec - minutes*60
+	degStr := fmt.Sprintf("%0*.0f", degWidth, deg)
 
 	if cg.compact {
-		return degStr + cg.sep.deg + fmt.Sprintf("%02.0f", minutes) + fmt.Sprintf("%02.0f", sec) + locLetter, nil
+		minStr := formatFixed(minutes, minWidth, 0)
+		secStr := formatFixed(sec, secWidth, 0)
+		return degStr + cg.sep.deg + minStr + secStr + locLetter, nil
 	}
 
-	minStr := fmt.Sprintf("%.0f", minutes)
-	secStr := fmt.Sprintf("%.*f", precision, sec)
-	if decSep == "," {
-		secStr = strings.Replace(secStr, ".", ",", 1)
-	}
+	minStr := formatFixed(minutes, minWidth, 0)
+	secStr := formatFixed(sec, secWidth, precision)
 	return degStr + cg.sep.deg + minStr + cg.sep.min + secStr + cg.sep.sec + locLetter, nil
 }
 
@@ -254,11 +274,11 @@ func ParsePoint(s string) (Point, error) {
 func (p Point) Format(latFmt, lonFmt, separator string) (string, error) {
 	lat, err := p.Lat.Format(latFmt)
 	if err != nil {
-		return "", fmt.Errorf("%w: latitude %q", err, lat)
+		return "", fmt.Errorf("%w: latitude format %q", err, latFmt)
 	}
 	lon, err := p.Lon.Format(lonFmt)
 	if err != nil {
-		return "", fmt.Errorf("%w: longitude %q", err, lon)
+		return "", fmt.Errorf("%w: longitude format %q", err, lonFmt)
 	}
 	return lat + separator + lon, nil
 }
@@ -391,16 +411,24 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLat := coordGroups{}
 	cgLon := coordGroups{}
 	// Request up to 3 matches to detect "too many coords" case
-	m := coordRegExp.FindAllStringSubmatch(cs, 3)
-	if len(m) == 0 {
+	matchIdx := coordRegExp.FindAllStringSubmatchIndex(cs, 3)
+	if len(matchIdx) == 0 {
 		return cgLat, cgLon, fmt.Errorf("%w: coords not found", ErrInvalidString)
 	}
-	if len(m) == 1 {
+	if len(matchIdx) == 1 {
 		return cgLat, cgLon, fmt.Errorf("%w: too few coords found", ErrInvalidString)
 	}
-	if len(m) > 2 {
+	if len(matchIdx) > 2 {
 		return cgLat, cgLon, fmt.Errorf("%w: too many coords found", ErrInvalidString)
 	}
+	if matchIdx[0][0] != 0 || matchIdx[1][1] != len(cs) {
+		return cgLat, cgLon, fmt.Errorf("%w: extra characters detected", ErrInvalidString)
+	}
+	if sep := cs[matchIdx[0][1]:matchIdx[1][0]]; !isPointSeparator(sep) {
+		return cgLat, cgLon, fmt.Errorf("%w: invalid separator", ErrInvalidString)
+	}
+
+	m := coordRegExp.FindAllStringSubmatch(cs, 2)
 
 	sen := coordRegExp.SubexpNames()
 	cgLat, _ = coordGroupsFromMatch(m[0], sen)
@@ -409,6 +437,15 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLat.normalizeCompact()
 	cgLon.normalizeCompact()
 	return cgLat, cgLon, nil
+}
+
+func isPointSeparator(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func (cg *coordGroups) getLocation() (Location, error) {
@@ -530,7 +567,20 @@ func (cg *coordGroups) getCoord() (Coord, error) {
 	if err != nil {
 		return coord, err
 	}
-	coord.Value = deg + minutes/60 + sec/3600
+	unsigned := deg + minutes/60 + sec/3600
+	limit := 180.0
+	kind := "coordinate"
+	if loc == LocLat {
+		limit = 90.0
+		kind = "latitude"
+	} else if loc == LocLon {
+		kind = "longitude"
+	}
+	if unsigned > limit {
+		return coord, fmt.Errorf("%w: %s", ErrOutOfRange, kind)
+	}
+
+	coord.Value = unsigned
 	if cg.sgn == "-" || cg.loc == "S" || cg.loc == "W" {
 		coord.Value = -coord.Value
 	}
