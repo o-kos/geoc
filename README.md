@@ -1,3 +1,6 @@
+[![CI](https://github.com/o-kos/geoc/actions/workflows/ci.yml/badge.svg)](https://github.com/o-kos/geoc/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/o-kos/geoc/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/o-kos/geoc/actions/workflows/github-code-scanning/codeql)
+
 # geoc
 
 `geoc` parses and formats geographic coordinates and points in Go.
