@@ -512,3 +512,91 @@ func TestCoordGroupsErrorBranches(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkParseCoord(b *testing.B) {
+	benchmarks := []struct {
+		name  string
+		input string
+	}{
+		{"DMS", `48°33'26.9604"N`},
+		{"MinDec", `48°33.4493'N`},
+		{"DegDec", `48.557489`},
+		{"Compact", `120-5749E`},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, _ = ParseCoord(bm.input)
+			}
+		})
+	}
+}
+
+func BenchmarkParsePoint(b *testing.B) {
+	benchmarks := []struct {
+		name  string
+		input string
+	}{
+		{"DMS", `48°33'27"N; 120°57'49"E`},
+		{"MinDec", `48-33N; 048-33.0E`},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, _ = ParsePoint(bm.input)
+			}
+		})
+	}
+}
+
+func BenchmarkCoordFormat(b *testing.B) {
+	coord := Coord{Value: 48.557489, Loc: LocLat}
+	benchmarks := []struct {
+		name    string
+		example string
+	}{
+		{"ToDMS", `48°33'27"N`},
+		{"ToMinDec", `48°33.4493'N`},
+		{"ToDegDec", `48.557489`},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, _ = coord.Format(bm.example)
+			}
+		})
+	}
+}
+
+func BenchmarkCoordString(b *testing.B) {
+	benchmarks := []struct {
+		name  string
+		coord Coord
+	}{
+		{"Lat", Coord{Value: 48.5575, Loc: LocLat}},
+		{"Lon", Coord{Value: 120.963611, Loc: LocLon}},
+		{"None", Coord{Value: 48.557489, Loc: LocNone}},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_ = bm.coord.String()
+			}
+		})
+	}
+}
+
+func BenchmarkPointString(b *testing.B) {
+	p := Point{
+		Lat: Coord{Value: 48.5575, Loc: LocLat},
+		Lon: Coord{Value: 120.963611, Loc: LocLon},
+	}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = p.String()
+	}
+}

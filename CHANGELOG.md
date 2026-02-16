@@ -1,13 +1,13 @@
 # Changelog
 
-## [0.2.0] by 2026-02-13
+## [0.2.0] by 2026-02-16
 
 ### Added
 
 - New functions:
   - `ParseCoord`
-  - `ParsePoint`
-  - `Coord.Format`
+  - `ParsePoint` (closes #2)
+  - `Coord.Format` (closes #5)
   - `Coord.String`
   - `Point.Format`
   - `Point.String`

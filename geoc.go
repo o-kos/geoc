@@ -213,24 +213,33 @@ func (c Coord) Format(example string) (string, error) {
 	return degStr + cg.sep.deg + minStr + cg.sep.min + secStr + cg.sep.sec + locLetter, nil
 }
 
+func formatMinDec(value float64, degWidth int, pos, neg byte) string {
+	absVal := math.Abs(value)
+	deg := math.Floor(absVal)
+	minutes := math.Round((absVal-deg)*60*10) / 10
+	if minutes >= 60 {
+		minutes = 0
+		deg++
+	}
+	letter := pos
+	if value < 0 {
+		letter = neg
+	}
+	return fmt.Sprintf("%0*.0f-%04.1f%c", degWidth, deg, minutes, letter)
+}
+
 // String returns default string representation of the coordinate.
 // Latitude uses MinDec format (48-33.0N), longitude uses MinDec
 // with 3-digit degrees (048-33.0E), unspecified uses decimal degrees.
 func (c Coord) String() string {
-	var example string
 	switch c.Loc {
 	case LocLat:
-		example = "48-33.0N"
+		return formatMinDec(c.Value, 2, 'N', 'S')
 	case LocLon:
-		example = "048-33.0E"
+		return formatMinDec(c.Value, 3, 'E', 'W')
 	default:
-		example = "48.557489"
-	}
-	s, err := c.Format(example)
-	if err != nil {
 		return strconv.FormatFloat(c.Value, 'f', -1, 64)
 	}
-	return s
 }
 
 // ParsePoint parses a string containing latitude and longitude.
@@ -285,13 +294,8 @@ func (p Point) Format(latFmt, lonFmt, separator string) (string, error) {
 
 // String returns default string representation of the point.
 // Default format is "48-33.0N 048-33.0E".
-// If formatting fails, falls back to individual coordinate strings.
 func (p Point) String() string {
-	s, err := p.Format("48-33.0N", "048-33.0E", " ")
-	if err != nil {
-		return p.Lat.String() + " " + p.Lon.String()
-	}
-	return s
+	return formatMinDec(p.Lat.Value, 2, 'N', 'S') + " " + formatMinDec(p.Lon.Value, 3, 'E', 'W')
 }
 
 type coordGroups struct {

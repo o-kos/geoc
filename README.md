@@ -60,6 +60,12 @@ Deprecated wrappers are still available:
 - `Point.String()` uses `48-33.0N 048-33.0E`; if formatting fails, it falls back to
   `p.Lat.String() + " " + p.Lon.String()`.
 
+## Benchmarks
+
+```bash
+go test -bench=. -benchmem ./...
+```
+
 ## Examples
 
 See runnable examples in `example_test.go`:
