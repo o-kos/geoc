@@ -57,8 +57,7 @@ Deprecated wrappers are still available:
   - latitude: `48-33.0N`
   - longitude: `048-33.0E`
   - unspecified location: decimal degrees
-- `Point.String()` uses `48-33.0N 048-33.0E`; if formatting fails, it falls back to
-  `p.Lat.String() + " " + p.Lon.String()`.
+- `Point.String()` uses `48-33.0N 048-33.0E`.
 
 ## Benchmarks
 

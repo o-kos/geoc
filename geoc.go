@@ -99,6 +99,9 @@ func (c Coord) Format(example string) (string, error) {
 	if loc == LocLon && absCoord > 180 {
 		return "", fmt.Errorf("%w: longitude %f", ErrOutOfRange, c.Value)
 	}
+	if loc == LocNone && absCoord > 180 {
+		return "", fmt.Errorf("%w: coordinate %f", ErrOutOfRange, c.Value)
+	}
 
 	negative := c.Value < 0
 
@@ -166,16 +169,23 @@ func (c Coord) Format(example string) (string, error) {
 			}
 		}
 	}
+	applySign := func(body string) string {
+		if cg.loc != "" {
+			return body
+		}
+		if negative {
+			return "-" + body
+		}
+		if cg.sgn == "+" {
+			return "+" + body
+		}
+		return body
+	}
 
 	// DegDec format
 	if !hasMin {
 		degStr := formatFixed(absCoord, degWidth, precision)
-		if negative && cg.loc == "" {
-			degStr = "-" + degStr
-		} else if cg.sgn == "+" {
-			degStr = "+" + degStr
-		}
-		return degStr + cg.sep.deg + locLetter, nil
+		return applySign(degStr) + cg.sep.deg + locLetter, nil
 	}
 
 	deg := math.Floor(absCoord)
@@ -189,7 +199,7 @@ func (c Coord) Format(example string) (string, error) {
 		}
 		degStr := fmt.Sprintf("%0*.0f", degWidth, deg)
 		minStr := formatFixed(minutes, minWidth, precision)
-		return degStr + cg.sep.deg + minStr + cg.sep.min + locLetter, nil
+		return applySign(degStr+cg.sep.deg+minStr+cg.sep.min) + locLetter, nil
 	}
 
 	// DMS format
@@ -205,12 +215,12 @@ func (c Coord) Format(example string) (string, error) {
 	if cg.compact {
 		minStr := formatFixed(minutes, minWidth, 0)
 		secStr := formatFixed(sec, secWidth, 0)
-		return degStr + cg.sep.deg + minStr + secStr + locLetter, nil
+		return applySign(degStr+cg.sep.deg+minStr+secStr) + locLetter, nil
 	}
 
 	minStr := formatFixed(minutes, minWidth, 0)
 	secStr := formatFixed(sec, secWidth, precision)
-	return degStr + cg.sep.deg + minStr + cg.sep.min + secStr + cg.sep.sec + locLetter, nil
+	return applySign(degStr+cg.sep.deg+minStr+cg.sep.min+secStr+cg.sep.sec) + locLetter, nil
 }
 
 func formatMinDec(value float64, degWidth int, pos, neg byte) string {

@@ -22,6 +22,8 @@ func TestCoordFormatPositive(t *testing.T) {
 		{`12.9999999`, `012-5749E`, `013-0000E`},
 		{`48.05`, `48°03'04"N`, `48°03'00"N`},
 		{`48.999999`, `48°33'27"N`, `49°00'00"N`},
+		{`-48.55`, `48-33-27`, `-48-33-00`},
+		{`48.55`, `+48-33-27`, `+48-33-00`},
 
 		// Negative coord flips location letter
 		{`-48.557489`, `48°33'27"N`, `48°33'27"S`},
@@ -35,11 +37,14 @@ func TestCoordFormatPositive(t *testing.T) {
 		{`48.999999`, `48-33.0N`, `49-00.0N`},
 		{`179.9999999`, `180-00.0E`, `180-00.0E`},
 		{`89.9999999`, `90-00.0N`, `90-00.0N`},
+		{`-48.55`, `48-33`, `-48-33`},
+		{`48.55`, `+48-33`, `+48-33`},
 
 		// DegDec formats
 		{`48.557489`, `48.557489`, `48.557489`},
 		{`48.557489`, `48,557489`, `48,557489`},
 		{`-48.557489`, `-48.557489`, `-48.557489`},
+		{`48.557489`, `+48.557489`, `+48.557489`},
 		{`48.0`, `48N`, `48N`},
 		{`48.0`, `48 N`, `48 N`},
 		{`48.0`, `48`, `48`},
@@ -79,6 +84,40 @@ func TestCoordFormatNegative(t *testing.T) {
 			}
 			if _, err := coord.Format(tc.example); err == nil {
 				t.Fatalf("Expected error for coord=%q, example=%q, got nil", tc.coord, tc.example)
+			}
+		})
+	}
+}
+
+func TestCoordFormatNegativeDirect(t *testing.T) {
+	testCases := []struct {
+		name        string
+		coord       Coord
+		example     string
+		expectedErr error
+	}{
+		{
+			name:        "loc_none_out_of_range_positive",
+			coord:       Coord{Value: 180.1, Loc: LocNone},
+			example:     `180.0`,
+			expectedErr: ErrOutOfRange,
+		},
+		{
+			name:        "loc_none_out_of_range_negative",
+			coord:       Coord{Value: -180.1, Loc: LocNone},
+			example:     `180.0`,
+			expectedErr: ErrOutOfRange,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.coord.Format(tc.example)
+			if err == nil {
+				t.Fatalf("Expected error for coord=%v, example=%q, got nil", tc.coord, tc.example)
+			}
+			if !errors.Is(err, tc.expectedErr) {
+				t.Fatalf("Expected error %q, got %q", tc.expectedErr, err)
 			}
 		})
 	}

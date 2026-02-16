@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.2.0] by 2026-02-16
+## [v0.2.1] by 2026-02-16
+
+### Changed
+
+- Enhance coordinate formatting to handle out-of-range values and apply sign consistently
+
+
+## [v0.2.0] by 2026-02-16
 
 ### Added
 
