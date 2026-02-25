@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.2.2] by 2026-02-25
+
+### Changed
+
+- Support new formats for coordinate parsing:
+  - `48.33.27N` (DMS with dots as separators)
+  - `120.57.49E` (DMS with dots as separators, equivalent to `120°57'49"E`)
+
 ## [v0.2.1] by 2026-02-16
 
 ### Changed
