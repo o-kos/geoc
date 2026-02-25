@@ -333,6 +333,31 @@ func (cg *coordGroups) normalizeCompact() {
 	}
 }
 
+// normalizeDotDMS handles forms like "70.19.4N" and "018.07.5E".
+// Regex can initially parse them as deg=70.19, min=4. This method
+// converts such shape into regular DMS groups: deg=70, min=19, sec=4.
+func (cg *coordGroups) normalizeDotDMS() {
+	if cg.loc == "" || cg.min == "" || cg.sec != "" || cg.sep.deg != "." {
+		return
+	}
+	if strings.ContainsAny(cg.min, ".,") {
+		return
+	}
+	if strings.Count(cg.deg, ".") != 1 {
+		return
+	}
+	parts := strings.SplitN(cg.deg, ".", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return
+	}
+	cg.deg = parts[0]
+	cg.sec = cg.min
+	cg.min = parts[1]
+	if cg.sep.min == "" {
+		cg.sep.min = "."
+	}
+}
+
 type formatClass int
 
 const (
@@ -354,8 +379,8 @@ func (cg *coordGroups) getFormatClass() formatClass {
 var coordRegExp = regexp.MustCompile(
 	`(\s*)` +
 		`(?P<sgn>[-+])?` +
-		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(?P<dsr>\s*[-°]?\s*)?)` +
-		`(?:(?P<min>\d+(?:[\.,]\d+)?)(?P<msr>\s*[-']?\s*)?)?` +
+		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(?P<dsr>\s*[-°\.]?\s*)?)` +
+		`(?:(?P<min>\d+(?:[\.,]\d+)?)(?P<msr>\s*[-'\.]?\s*)?)?` +
 		`(?:(?P<sec>\d+(?:[\.,]\d+)?)(?P<ssr>\s*[ "]?\s*)?)?` +
 		`(?P<loc>[NSEW])?(\s*)`,
 )
@@ -417,6 +442,7 @@ func newCoordGroups(cs string) (coordGroups, error) {
 		return cg, fmt.Errorf("%w: extra characters detected", ErrInvalidString)
 	}
 
+	cg.normalizeDotDMS()
 	cg.normalizeCompact()
 	return cg, nil
 }
@@ -448,6 +474,16 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLat, _ = coordGroupsFromMatch(m[0], sen)
 	cgLon, _ = coordGroupsFromMatch(m[1], sen)
 
+	// If coords are glued with '-' (e.g. "70.19.4N-018.07.5E"),
+	// regex treats '-' as sign of second coord. When second coord has
+	// location letter, sign is invalid and '-' should be interpreted
+	// as point separator.
+	if matchIdx[0][1] == matchIdx[1][0] && cgLon.sgn == "-" && cgLon.loc != "" {
+		cgLon.sgn = ""
+	}
+
+	cgLat.normalizeDotDMS()
+	cgLon.normalizeDotDMS()
 	cgLat.normalizeCompact()
 	cgLon.normalizeCompact()
 	return cgLat, cgLon, nil
