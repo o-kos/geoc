@@ -84,9 +84,10 @@ func (c Coord) Format(example string) (string, error) {
 	// Use Coord's Loc if set, otherwise derive from example
 	loc := c.Loc
 	if loc == LocNone {
-		if cg.loc == "N" || cg.loc == "S" {
+		switch cg.loc {
+		case "N", "S":
 			loc = LocLat
-		} else if cg.loc == "E" || cg.loc == "W" {
+		case "E", "W":
 			loc = LocLon
 		}
 	}
@@ -117,11 +118,12 @@ func (c Coord) Format(example string) (string, error) {
 			precision = len(s) - idx - 1
 		}
 	}
-	if hasSec && !cg.compact {
+	switch {
+	case hasSec && !cg.compact:
 		detectDecimal(cg.sec)
-	} else if hasMin && !cg.compact {
+	case hasMin && !cg.compact:
 		detectDecimal(cg.min)
-	} else if !hasMin {
+	case !hasMin:
 		detectDecimal(cg.deg)
 	}
 
@@ -157,16 +159,15 @@ func (c Coord) Format(example string) (string, error) {
 	// Determine output location letter
 	locLetter := ""
 	if cg.loc != "" {
-		if loc == LocLat {
+		switch {
+		case loc == LocLat && negative:
+			locLetter = "S"
+		case loc == LocLat:
 			locLetter = "N"
-			if negative {
-				locLetter = "S"
-			}
-		} else {
+		case negative:
+			locLetter = "W"
+		default:
 			locLetter = "E"
-			if negative {
-				locLetter = "W"
-			}
 		}
 	}
 	applySign := func(body string) string {
@@ -376,12 +377,31 @@ func (cg *coordGroups) getFormatClass() formatClass {
 	return dms
 }
 
+// Shared building blocks for the coordinate regex. coordRegexCore (the
+// non-capturing source returned by CoordRegexSource) and coordRegExp (the
+// named-group version used by ParseCoord/ParsePoint) reuse these so the two
+// stay structurally in sync.
+const (
+	rxNum    = `\d+(?:[\.,]\d+)?`
+	rxDegSep = `\s*[-°\.]?\s*`
+	rxMinSep = `\s*[-'\.]?\s*`
+	rxSecSep = `\s*[ "]?\s*`
+)
+
+// coordRegexCore matches a single coordinate without capture groups and
+// without surrounding whitespace. Suitable for embedding into user patterns.
+const coordRegexCore = `[-+]?` +
+	`(?:` + rxNum + `(?:` + rxDegSep + `)?)` +
+	`(?:` + rxNum + `(?:` + rxMinSep + `)?)?` +
+	`(?:` + rxNum + `(?:` + rxSecSep + `)?)?` +
+	`[NSEW]?`
+
 var coordRegExp = regexp.MustCompile(
 	`(\s*)` +
 		`(?P<sgn>[-+])?` +
-		`(?:(?P<deg>\d+(?:[\.,]\d+)?)(?P<dsr>\s*[-°\.]?\s*)?)` +
-		`(?:(?P<min>\d+(?:[\.,]\d+)?)(?P<msr>\s*[-'\.]?\s*)?)?` +
-		`(?:(?P<sec>\d+(?:[\.,]\d+)?)(?P<ssr>\s*[ "]?\s*)?)?` +
+		`(?:(?P<deg>` + rxNum + `)(?P<dsr>` + rxDegSep + `)?)` +
+		`(?:(?P<min>` + rxNum + `)(?P<msr>` + rxMinSep + `)?)?` +
+		`(?:(?P<sec>` + rxNum + `)(?P<ssr>` + rxSecSep + `)?)?` +
 		`(?P<loc>[NSEW])?(\s*)`,
 )
 
@@ -499,13 +519,12 @@ func isPointSeparator(s string) bool {
 }
 
 func (cg *coordGroups) getLocation() (Location, error) {
-	if cg.loc == "N" || cg.loc == "S" {
+	switch cg.loc {
+	case "N", "S":
 		return LocLat, nil
-	}
-	if cg.loc == "E" || cg.loc == "W" {
+	case "E", "W":
 		return LocLon, nil
-	}
-	if cg.loc == "" {
+	case "":
 		return LocNone, nil
 	}
 

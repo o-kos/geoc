@@ -58,6 +58,24 @@ func ExamplePoint_Format() {
 	// 48°33'27"N; 120°57'49"E
 }
 
+func ExampleFindCoords() {
+	text := "WARNING 175/22 - mines reported near 39 27 25.55N - 009 39 25E, " +
+		"stay clear within 3 NM."
+	for _, m := range FindCoords(text, RequireDirection()) {
+		fmt.Printf("%d-%d %s %q\n", m.Start, m.End, m.Coord.Loc, m.Text)
+	}
+	// Output:
+	// 37-49 Lat "39 27 25.55N"
+	// 52-62 Lon "009 39 25E"
+}
+
+func ExampleCoordRegexSource() {
+	src := CoordRegexSource()
+	fmt.Println(len(src) > 0)
+	// Output:
+	// true
+}
+
 func ExamplePoint_String() {
 	p := Point{
 		Lat: Coord{Value: 48.5575, Loc: LocLat},
