@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.3.0] — unreleased
+
+### Added
+
+- `FindCoords(s string, opts ...FindOption) []Match` for locating coordinate
+  substrings in arbitrary text (free-form descriptions, message bodies).
+- `Match` struct with `Start`, `End`, `Text`, `Coord` fields.
+- `FindOption` constructors: `RequireDirection`, `OnlyLat`, `OnlyLon`.
+- `CoordRegexSource() string` returning the non-capturing regex source for
+  one coordinate, suitable for embedding into user-defined patterns.
+
+### Changed
+
+- Internal coordinate regex refactored into shared building blocks
+  (`rxNum`, `rxDegSep`, `rxMinSep`, `rxSecSep`) plus a non-capturing core
+  reused by `CoordRegexSource`. `ParseCoord`/`ParsePoint` behavior is
+  unchanged.
+
 ## [v0.2.2] by 2026-02-25
 
 ### Changed

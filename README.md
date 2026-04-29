@@ -34,6 +34,11 @@ go get github.com/o-kos/geoc
   - `ParseCoord(s string) (Coord, error)`
 - Parse point:
   - `ParsePoint(s string) (Point, error)`
+- Find coordinates inside arbitrary text:
+  - `FindCoords(s string, opts ...FindOption) []Match`
+  - Options: `RequireDirection`, `OnlyLat`, `OnlyLon`
+- Embed the coordinate regex into your own patterns:
+  - `CoordRegexSource() string`
 - Format coordinate by example:
   - `Coord.Format(example string) (string, error)`
 - Format point by examples:
@@ -62,6 +67,33 @@ Deprecated wrappers are still available:
   - longitude: `048-33.0E`
   - unspecified location: decimal degrees
 - `Point.String()` uses `48-33.0N 048-33.0E`.
+
+## Finding coordinates in text
+
+`FindCoords` scans an arbitrary string and returns every coordinate
+substring it can parse, in order of appearance. Useful for free-form
+inputs such as NAVTEX message bodies:
+
+```go
+text := "WARNING 175/22 - mines reported near 39 27 25.55N - 009 39 25E, " +
+    "stay clear within 3 NM."
+
+for _, m := range geoc.FindCoords(text, geoc.RequireDirection()) {
+    fmt.Printf("%d-%d %s %q\n", m.Start, m.End, m.Coord.Loc, m.Text)
+}
+// Output:
+// 37-49 Lat "39 27 25.55N"
+// 52-62 Lon "009 39 25E"
+```
+
+The `175/22` message number, surrounding noise, and `3 NM` (nautical
+miles) are correctly skipped.
+
+`RequireDirection` skips matches without an `N/S/E/W` letter (dates,
+message numbers, distances). `OnlyLat` / `OnlyLon` further restrict to
+one axis. To embed the same coordinate regex into your own pattern, use
+`CoordRegexSource()` — it returns a non-capturing source string with no
+surrounding whitespace.
 
 ## Benchmarks
 
