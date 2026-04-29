@@ -1,9 +1,5 @@
 package geoc
 
-import (
-	"unicode"
-)
-
 // Match describes a coordinate located inside arbitrary text.
 type Match struct {
 	Start, End int    // byte offsets in the input string
@@ -136,15 +132,24 @@ func isAsciiLetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-// trimMatchSpan returns [start, end] adjusted to exclude leading/trailing
-// ASCII whitespace that the regex may have consumed via its outer (\s*)
-// groups or via inner separators when no further coord component followed.
+// trimMatchSpan returns [start, end] adjusted to exclude ASCII whitespace
+// that the regex may have consumed via its outer (\s*) groups or via inner
+// separators when no further coord component followed. Matches RE2's \s
+// class: space, tab, newline, carriage return, form feed, vertical tab.
 func trimMatchSpan(s string, start, end int) (int, int) {
-	for start < end && unicode.IsSpace(rune(s[start])) {
+	for start < end && isAsciiSpace(s[start]) {
 		start++
 	}
-	for end > start && unicode.IsSpace(rune(s[end-1])) {
+	for end > start && isAsciiSpace(s[end-1]) {
 		end--
 	}
 	return start, end
+}
+
+func isAsciiSpace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r', '\f', '\v':
+		return true
+	}
+	return false
 }
