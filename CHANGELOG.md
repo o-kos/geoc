@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.1] by 2026-04-29
+
+### Changed
+
+- No code changes; v0.3.0 re-released under a signed tag.
+
 ## [v0.3.0] by 2026-04-29
 
 ### Added
@@ -31,7 +37,6 @@
 ### Changed
 
 - Enhance coordinate formatting to handle out-of-range values and apply sign consistently
-
 
 ## [v0.2.0] by 2026-02-16
 
