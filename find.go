@@ -95,7 +95,7 @@ func FindCoords(s string, opts ...FindOption) []Match {
 		// this check the regex would treat such fragments as coords.
 		if cg.loc != "" {
 			locEnd := idx[2*locGroupIndex+1]
-			if locEnd >= 0 && locEnd < len(s) && isAsciiLetter(s[locEnd]) {
+			if locEnd >= 0 && locEnd < len(s) && isASCIILetter(s[locEnd]) {
 				continue
 			}
 		}
@@ -128,7 +128,7 @@ func FindCoords(s string, opts ...FindOption) []Match {
 	return out
 }
 
-func isAsciiLetter(b byte) bool {
+func isASCIILetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
@@ -137,16 +137,16 @@ func isAsciiLetter(b byte) bool {
 // separators when no further coord component followed. Matches RE2's \s
 // class: space, tab, newline, carriage return, form feed, vertical tab.
 func trimMatchSpan(s string, start, end int) (int, int) {
-	for start < end && isAsciiSpace(s[start]) {
+	for start < end && isASCIISpace(s[start]) {
 		start++
 	}
-	for end > start && isAsciiSpace(s[end-1]) {
+	for end > start && isASCIISpace(s[end-1]) {
 		end--
 	}
 	return start, end
 }
 
-func isAsciiSpace(b byte) bool {
+func isASCIISpace(b byte) bool {
 	switch b {
 	case ' ', '\t', '\n', '\r', '\f', '\v':
 		return true
