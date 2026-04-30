@@ -382,8 +382,13 @@ func (cg *coordGroups) getFormatClass() formatClass {
 // named-group version used by ParseCoord/ParsePoint) reuse these so the two
 // stay structurally in sync.
 const (
-	rxNum    = `\d+(?:[\.,]\d+)?`
-	rxDegSep = `\s*[-°\.]?\s*`
+	rxNum = `\d+(?:[\.,]\d+)?`
+	// rxDegSep allows a newline only when bridged by an explicit "-"/"°"/"."
+	// separator (intra-coord linebreak like "38-\n34.2N"). Without such a
+	// separator, only horizontal whitespace is allowed — otherwise FindCoords
+	// would greedily eat "\n" between an unrelated number and the next line's
+	// real coordinate (e.g. "BR-117\n55-54.0N").
+	rxDegSep = `[^\S\n]*(?:[-°\.][^\S\n]*\n?[^\S\n]*)?`
 	rxMinSep = `\s*[-'\.]?\s*`
 	rxSecSep = `\s*[ "]?\s*`
 )
