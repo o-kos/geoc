@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.3.2] — unreleased
+
+### Fixed
+
+- `FindCoords` no longer mismatches the `N`/`S` in distance abbreviations
+  like `1 N.M.`, `5 S.M.`, or `10 N MILE` as a coordinate.
+- `FindCoords` now recovers a real coordinate that follows a noise number
+  separated by a line break, e.g. `BR-117\n55-54.0N` returns `55-54.0N`
+  instead of being lost inside the oversized 117° candidate.
+- `FindCoords` accepts a fully-specified DMS coord glued to a non-coord
+  word (NAVTEX terminator `NNN`, message word `END`, etc.), so
+  `124-50-00ENNN` returns `124-50-00E`.
+
+### Changed
+
+- Internal coordinate regex: `\n` between deg and min components is now
+  allowed only when bridged by an explicit `-`/`°`/`.` separator (the
+  intra-coord linebreak shape `38-\n34.2N`). This affects `CoordRegexSource`
+  too and is what enables the cross-line fix above.
+
 ## [v0.3.1] by 2026-04-29
 
 ### Changed

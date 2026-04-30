@@ -1,5 +1,13 @@
 package geoc
 
+import "regexp"
+
+// unitSuffixRE matches a distance-unit abbreviation glued to a direction
+// letter. When this matches the bytes immediately after the loc letter, the
+// candidate is a distance fragment ("1 N.M.", "5 S.M.", "10 N MILE", "5 KM"),
+// not a coordinate.
+var unitSuffixRE = regexp.MustCompile(`(?i)^\.?[ \t]*(?:M\.|MILE\b|MI\b|KM\b)`)
+
 // Match describes a coordinate located inside arbitrary text.
 type Match struct {
 	Start, End int    // byte offsets in the input string
@@ -63,6 +71,11 @@ var locGroupIndex = func() int {
 
 // FindCoords returns all coordinate occurrences inside s, in order of
 // appearance. Candidates that fail to parse are skipped silently.
+//
+// FindCoords runs a manual scan loop rather than FindAllStringSubmatchIndex
+// so that when a candidate is dropped (out-of-range degrees, glued unit
+// suffix, RequireDirection mismatch) the search can recover a real coord
+// hidden inside the dropped span: see TestFindCoordsNoCrossLineGreedy.
 func FindCoords(s string, opts ...FindOption) []Match {
 	cfg := findConfig{}
 	for _, opt := range opts {
@@ -70,13 +83,23 @@ func FindCoords(s string, opts ...FindOption) []Match {
 	}
 
 	subNames := coordRegExp.SubexpNames()
-	allIdx := coordRegExp.FindAllStringSubmatchIndex(s, -1)
-	if len(allIdx) == 0 {
-		return nil
-	}
+	var out []Match
+	pos := 0
 
-	out := make([]Match, 0, len(allIdx))
-	for _, idx := range allIdx {
+	for pos < len(s) {
+		rel := coordRegExp.FindStringSubmatchIndex(s[pos:])
+		if rel == nil {
+			break
+		}
+		idx := make([]int, len(rel))
+		for i, v := range rel {
+			if v < 0 {
+				idx[i] = v
+			} else {
+				idx[i] = v + pos
+			}
+		}
+
 		groups := make([]string, len(subNames))
 		for i := range subNames {
 			gStart, gEnd := idx[2*i], idx[2*i+1]
@@ -89,31 +112,29 @@ func FindCoords(s string, opts ...FindOption) []Match {
 		cg.normalizeDotDMS()
 		cg.normalizeCompact()
 
-		// If the loc letter is glued to another letter (e.g. "N" in "NM"
-		// for nautical miles, "S" in "SE", "E" in "End"), it is part of
-		// a word, not a direction marker. Drop the candidate — without
-		// this check the regex would treat such fragments as coords.
-		if cg.loc != "" {
-			locEnd := idx[2*locGroupIndex+1]
-			if locEnd >= 0 && locEnd < len(s) && isASCIILetter(s[locEnd]) {
-				continue
-			}
+		if !acceptLetterGlue(s, idx[2*locGroupIndex+1], &cg) {
+			pos = idx[0] + 1
+			continue
 		}
 
 		coord, err := cg.getCoord()
 		if err != nil {
+			pos = idx[0] + 1
 			continue
 		}
 
 		if cfg.requireDirection && cg.loc == "" {
+			pos = idx[0] + 1
 			continue
 		}
 		if cfg.onlyLoc != LocNone && coord.Loc != cfg.onlyLoc {
+			pos = idx[1]
 			continue
 		}
 
 		start, end := trimMatchSpan(s, idx[0], idx[1])
 		if start >= end {
+			pos = idx[1]
 			continue
 		}
 
@@ -123,9 +144,51 @@ func FindCoords(s string, opts ...FindOption) []Match {
 			Text:  s[start:end],
 			Coord: coord,
 		})
+		pos = idx[1]
 	}
 
 	return out
+}
+
+// acceptLetterGlue reports whether a candidate's loc letter is followed by
+// bytes that should make us drop it. Returns true to keep the candidate.
+//
+// The check is in two parts:
+//
+//   - Unit suffix (".M.", " MILE", "KM" etc.): always drops, since the
+//     direction letter is part of a distance token, not a coordinate.
+//   - Plain letter glue (e.g. "1NORTH", "3 NM"): drops minimal candidates
+//     (no min/sec) where the trailing word could be anything, but accepts
+//     fully-specified DMS candidates whose trailing letters can't form a
+//     coord on their own (NAVTEX terminator "NNN", message words like
+//     "END"/"AREA"). See TestFindCoordsGluedToTerminator.
+func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
+	if cg.loc == "" || locEnd < 0 || locEnd >= len(s) {
+		return true
+	}
+	rest := s[locEnd:]
+	if unitSuffixRE.MatchString(rest) {
+		return false
+	}
+	if !isASCIILetter(rest[0]) {
+		return true
+	}
+	// Trailing letter glue. Keep the candidate only if it has full DMS
+	// structure (deg+min+sec) AND the trailing alphanumeric run contains
+	// no digits — i.e. it's a word, not another glued coord.
+	if cg.sec == "" {
+		return false
+	}
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if c >= '0' && c <= '9' {
+			return false
+		}
+		if !isASCIILetter(c) {
+			break
+		}
+	}
+	return true
 }
 
 func isASCIILetter(b byte) bool {

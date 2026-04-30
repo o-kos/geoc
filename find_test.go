@@ -208,6 +208,90 @@ func TestFindCoordsOnlyLatOnlyLon(t *testing.T) {
 	})
 }
 
+func TestFindCoordsUnitSuffixRejected(t *testing.T) {
+	// Direction letters glued to a unit abbreviation ("1 N.M.", "5 S.M.")
+	// must not be accepted as coordinates — the trailing dot makes the
+	// naive one-byte letter-glue check pass, so the regex needs a proper
+	// look-ahead for known distance units.
+	cases := []findCase{
+		{name: "nautical_mile_dotted", input: "1 N.M.", want: nil},
+		{name: "statute_mile_dotted", input: "5 S.M.", want: nil},
+		{name: "nautical_mile_radius", input: "RADIUS 1 N.M.", want: nil},
+		{name: "nautical_mile_within", input: "WITHIN 10 N.M. OF", want: nil},
+		// Counter-cases: real coords must keep matching.
+		{
+			name:  "real_coord_pair",
+			input: "1N 2E",
+			want:  []string{"1N", "2E"},
+		},
+		{
+			name:  "direction_with_period_then_word",
+			input: "1N. AREA",
+			want:  []string{"1N"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
+func TestFindCoordsNoCrossLineGreedy(t *testing.T) {
+	// A noise number followed by a real coordinate on the next line must
+	// not collapse into a single oversized candidate that swallows the
+	// real coord ("BR-117\n55-54.0N" used to lose the 55-54.0N match
+	// because deg=117 ate the linebreak).
+	cases := []findCase{
+		{
+			name:  "navtex_zone_then_pair",
+			input: "BR-117\n55-54.0N 019-03.0E",
+			want:  []string{"55-54.0N", "019-03.0E"},
+		},
+		{
+			name:  "header_line_then_pair",
+			input: "FROM 192200 UTC\n34-35.6N 139-49.2E",
+			want:  []string{"34-35.6N", "139-49.2E"},
+		},
+		// Counter-case: a hyphen-bridged linebreak inside one coord must
+		// stay as a single match.
+		{
+			name:  "intra_coord_linebreak_after_dash",
+			input: "lat 38-\n34.2N text",
+			want:  []string{"38-\n34.2N"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
+func TestFindCoordsGluedToTerminator(t *testing.T) {
+	// A fully-specified coord glued to a non-coord word (NAVTEX terminator
+	// "NNN", message "END", etc.) must still be returned. The trailing
+	// letters can't themselves form a coordinate, so the strict
+	// letter-glue check is too aggressive in this shape.
+	cases := []findCase{
+		{
+			name:  "navtex_terminator_NNN",
+			input: "124-50-00ENNN",
+			want:  []string{"124-50-00E"},
+		},
+		// Counter-case: a minimal coord "3 N" glued to "M" (3 NM = 3
+		// nautical miles) must keep being rejected — the candidate has
+		// no min/sec to anchor it as a real coord.
+		{
+			name:  "distance_nm_minimal",
+			input: "3 NM",
+			want:  nil,
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
 func TestCoordRegexSourceEmbeddable(t *testing.T) {
 	// CoordRegexSource() output must be safe to embed inside a user-defined
 	// named group: it must not contain capture-group syntax of its own.
