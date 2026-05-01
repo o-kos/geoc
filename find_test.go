@@ -292,6 +292,126 @@ func TestFindCoordsGluedToTerminator(t *testing.T) {
 	runFindCases(t, cases)
 }
 
+func TestFindCoordsInlineBacktrack(t *testing.T) {
+	// A purely numeric prefix glued to a real coordinate by a space made
+	// FindCoords backtrack only one byte after the out-of-range deg failed,
+	// landing on a still-valid sub-candidate ("235 43-18.0N" → "35 43-18.0N").
+	// Backtracking past the first whitespace inside the consumed span
+	// recovers the real coord.
+	cases := []findCase{
+		{
+			name:  "numeric_prefix_single",
+			input: "235 43-18.0N",
+			want:  []string{"43-18.0N"},
+		},
+		{
+			name:  "numeric_prefix_with_label",
+			input: "NO 235 43-18.0N",
+			want:  []string{"43-18.0N"},
+		},
+		{
+			name:  "numeric_prefix_pair",
+			input: "999 60-10.3N 028-45.7E",
+			want:  []string{"60-10.3N", "028-45.7E"},
+		},
+		{
+			name:  "four_digit_prefix",
+			input: "1234 89-59.9N",
+			want:  []string{"89-59.9N"},
+		},
+		{
+			name:  "real_navtex_area_line",
+			input: "A. NO 235 43-18.0N 047-47.6E 43-26.0N 047-47.6E",
+			want:  []string{"43-18.0N", "047-47.6E", "43-26.0N", "047-47.6E"},
+		},
+		// Counter-cases: must not break v0.3.2 behavior.
+		{
+			name:  "cross_line_zone_then_pair",
+			input: "BR-117\n55-54.0N 019-03.0E",
+			want:  []string{"55-54.0N", "019-03.0E"},
+		},
+		{
+			name:  "adjacent_valid_pair",
+			input: "55-54.0N 12-30.0N",
+			want:  []string{"55-54.0N", "12-30.0N"},
+		},
+		{
+			name:  "no_direction_no_match",
+			input: "10 20",
+			want:  nil,
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
+func TestFindCoordsOCRGlue(t *testing.T) {
+	// OCR sometimes wedges a single non-direction letter between two
+	// adjacent coordinates ("46-20.0NR142-2.0E"). v0.3.2's letter-glue
+	// check rejected such candidates; v0.3.3 accepts them when the trailing
+	// letter is followed (optionally after whitespace) by a digit.
+	cases := []findCase{
+		{
+			name:  "letter_then_digit_no_space",
+			input: "46-20.0NR142-2.0E",
+			want:  []string{"46-20.0N", "142-2.0E"},
+		},
+		{
+			name:  "letter_then_digit_q",
+			input: "30-15.0NQ140-30.0E",
+			want:  []string{"30-15.0N", "140-30.0E"},
+		},
+		{
+			name:  "letter_space_then_digit",
+			input: "30-15.0NX 140-30.0E",
+			want:  []string{"30-15.0N", "140-30.0E"},
+		},
+		// Counter-cases: must keep being rejected.
+		{
+			name:  "unit_with_dotted_M",
+			input: "1 N.M.",
+			want:  nil,
+		},
+		{
+			name:  "minimal_with_M",
+			input: "30NM",
+			want:  nil,
+		},
+		{
+			name:  "minimal_with_adjacent_direction",
+			input: "30NS",
+			want:  nil,
+		},
+		{
+			name:  "minimal_with_lone_letter",
+			input: "30NX",
+			want:  nil,
+		},
+		{
+			name:  "minimal_with_two_letters_then_digit",
+			input: "30NXY12",
+			want:  nil,
+		},
+		// Already worked in v0.3.2; lock it in.
+		{
+			name:  "navtex_terminator_NNN",
+			input: "124-50-00ENNN",
+			want:  []string{"124-50-00E"},
+		},
+		{
+			name:  "minimal_with_terminator_word",
+			input: "30N END",
+			want:  []string{"30N"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
 func TestCoordRegexSourceEmbeddable(t *testing.T) {
 	// CoordRegexSource() output must be safe to embed inside a user-defined
 	// named group: it must not contain capture-group syntax of its own.
