@@ -119,7 +119,16 @@ func FindCoords(s string, opts ...FindOption) []Match {
 
 		coord, err := cg.getCoord()
 		if err != nil {
-			pos = idx[0] + 1
+			// Backtrack past the first whitespace inside the consumed
+			// candidate so a noise prefix glued to a coord by a space
+			// ("235 43-18.0N") doesn't trap us on a still-valid sub-
+			// candidate ("35 43-18.0N"). Same shape as the cross-line
+			// "BR-117\n55-54.0N" recovery, generalized.
+			if next := firstSpacePast(s, idx[0], idx[1]); next > 0 {
+				pos = next
+			} else {
+				pos = idx[0] + 1
+			}
 			continue
 		}
 
@@ -173,6 +182,12 @@ func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 	if !isASCIILetter(rest[0]) {
 		return true
 	}
+	// OCR-glue: a single non-direction letter wedged between two adjacent
+	// coordinates ("46-20.0NR142-2.0E"). The next regex pass will pick up
+	// the second coord; here we just accept the current one.
+	if !isDirectionLetter(rest[0]) && isOCRGluePrefix(rest) {
+		return true
+	}
 	// Trailing letter glue. Keep the candidate only if it has full DMS
 	// structure (deg+min+sec) AND the trailing alphanumeric run contains
 	// no digits — i.e. it's a word, not another glued coord.
@@ -193,6 +208,45 @@ func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 
 func isASCIILetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+func isDirectionLetter(b byte) bool {
+	switch b {
+	case 'N', 'S', 'E', 'W', 'n', 's', 'e', 'w':
+		return true
+	}
+	return false
+}
+
+// isOCRGluePrefix reports whether rest looks like an OCR-induced single
+// letter wedged between two coordinates: one ASCII letter, optionally
+// followed by horizontal whitespace, then an ASCII digit. Two consecutive
+// letters disqualify it (that's a word, not a glue artifact).
+func isOCRGluePrefix(rest string) bool {
+	if len(rest) < 2 || !isASCIILetter(rest[0]) {
+		return false
+	}
+	if isASCIILetter(rest[1]) {
+		return false
+	}
+	i := 1
+	for i < len(rest) && (rest[i] == ' ' || rest[i] == '\t') {
+		i++
+	}
+	return i < len(rest) && rest[i] >= '0' && rest[i] <= '9'
+}
+
+// firstSpacePast returns the byte position right after the first ASCII
+// whitespace inside s[start:end], or -1 if none. Used to recover from
+// candidates whose numeric prefix made the whole span fail range checks
+// ("235 43-18.0N" → restart at "43-18.0N", not "35 43-18.0N").
+func firstSpacePast(s string, start, end int) int {
+	for i := start; i < end; i++ {
+		if isASCIISpace(s[i]) {
+			return i + 1
+		}
+	}
+	return -1
 }
 
 // trimMatchSpan returns [start, end] adjusted to exclude ASCII whitespace
