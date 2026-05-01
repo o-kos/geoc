@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.3.3] — unreleased
+
+### Fixed
+
+- `FindCoords` now recovers the real coordinate when a numeric prefix is
+  glued to it by a space, e.g. `235 43-18.0N` returns `43-18.0N` instead of
+  the truncated `35 43-18.0N`. Backtracking on a failed candidate now skips
+  past the first whitespace inside the consumed span (same shape as the
+  v0.3.2 cross-line `\n` recovery, generalized).
+- `FindCoords` accepts a coordinate followed by a single non-direction
+  letter that is itself followed (optionally after whitespace) by a digit —
+  the fingerprint of an OCR glitch wedged between two adjacent coords. So
+  `46-20.0NR142-2.0E` now returns both `46-20.0N` and `142-2.0E`. Existing
+  unit / adjacent-direction / multi-letter-word rejections are preserved.
+
 ## [v0.3.2] by 2026-04-30
 
 ### Fixed
