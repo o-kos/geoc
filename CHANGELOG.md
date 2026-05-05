@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.3.4] by 2026-05-05
+
+### Fixed
+
+- `ParseCoord`/`FindCoords` now accept italian-NAVTEX OCR output where the
+  fractional part of minutes is written as 3 digits without a decimal point
+  ("44 33 367N" really meaning 44° 33.367′ N). The shape — space-separated
+  deg/min/sec where sec is exactly 3 digits with no decimal — is now
+  reinterpreted as `min.frac`, so previously rejected inputs (sec ≥ 60) parse
+  correctly and `FindCoords` no longer falls back to noise sub-candidates
+  ("44 33 367N" used to surface as just `67N` via the v0.3.3 inline backtrack).
+
+### Changed
+
+- **Behavior change** for `<deg> <mm> <ddd>[NSEW]` shape with sec value < 60.
+  Previously interpreted as classical DMS (e.g. `44 33 048N` → 44° 33′ 48″ ≈
+  44.5633°); now interpreted as italian min.frac (44° 33.048′ ≈ 44.5508°).
+  The 3-digit no-decimal sec field with pure-space separators is a reliable
+  fingerprint of the italian format; classical DMS keeps working with
+  hyphen/`°`/`:` separators or a decimal in the sec field.
+
 ## [v0.3.3] by 2026-05-01
 
 ### Fixed
