@@ -360,6 +360,16 @@ func TestParseCoordPositive(t *testing.T) {
 		{`90S`, -90, LocLat},
 		{`180E`, 180, LocLon},
 		{`180W`, -180, LocLon},
+
+		// Italian min.frac (Case A): space-separated <deg> <min> <minFrac3>[NSEW]
+		{`44 33 367N`, 44.556117, LocLat}, // 44° 33.367' N
+		{`44 38 008N`, 44.633467, LocLat}, // 44° 38.008' N (NOT DMS sec=8)
+		{`44 33 048N`, 44.5508, LocLat},   // 44° 33.048' N (NOT DMS sec=48)
+		{`012 33.853E`, 12.564217, LocLon},
+
+		// Trailing dot before direction letter (Case C): "52.E" → 52.0°E
+		{`52.E`, 52, LocLon},
+		{`012-30.N`, 12.5, LocLat},
 	}
 
 	for _, tc := range testCases {

@@ -412,6 +412,107 @@ func TestFindCoordsOCRGlue(t *testing.T) {
 	runFindCases(t, cases)
 }
 
+func TestFindCoordsItalianBadDec(t *testing.T) {
+	// Italian NAVTEX OCR omits the decimal point in the fractional part of
+	// minutes: "44 33 367N" really means "44° 33.367' N". The shape is
+	// space-separated deg/min/sec where sec is exactly 3 digits without a
+	// decimal — distinct from classical DMS.
+	cases := []findCase{
+		{
+			name:  "frac_over_60_pure",
+			input: "44 33 367N",
+			want:  []string{"44 33 367N"},
+		},
+		{
+			name:  "frac_under_60_with_pad",
+			input: "44 38 008N",
+			want:  []string{"44 38 008N"},
+		},
+		{
+			name:  "ambiguous_under_60",
+			input: "44 33 048N",
+			want:  []string{"44 33 048N"},
+		},
+		{
+			name:  "lat_lon_pair_mixed_styles",
+			input: "44 33 048N 012 33.155E",
+			want:  []string{"44 33 048N", "012 33.155E"},
+		},
+		{
+			name:  "real_navtex_block",
+			input: "44 33 367N 012 33.853E\n44 38 617N 012 28.754E",
+			want: []string{
+				"44 33 367N", "012 33.853E",
+				"44 38 617N", "012 28.754E",
+			},
+		},
+		// Counter-cases: classical DMS must keep its meaning.
+		{
+			name:  "classical_dms_two_digit_sec",
+			input: "44 33 12N",
+			want:  []string{"44 33 12N"},
+		},
+		{
+			name:  "classical_dms_with_decimal_sec",
+			input: "44 33-12.0N",
+			want:  []string{"44 33-12.0N"},
+		},
+		{
+			name:  "classical_dms_hyphens",
+			input: "48-33-27N",
+			want:  []string{"48-33-27N"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
+func TestFindCoordsTrailingDot(t *testing.T) {
+	// A dot directly before a direction letter ("52.E") happens when OCR
+	// drops the digit after the decimal point. The trailing dot is treated
+	// as a deg/coord-letter separator, so the candidate is recognized as
+	// 52°E without any extra normalization.
+	cases := []findCase{
+		{
+			name:  "trailing_dot_lon",
+			input: "52.E",
+			want:  []string{"52.E"},
+		},
+		{
+			name:  "trailing_dot_lat",
+			input: "12.N",
+			want:  []string{"12.N"},
+		},
+		{
+			name:  "pair_trailing_dot",
+			input: "12.N 045.E",
+			want:  []string{"12.N", "045.E"},
+		},
+		{
+			name:  "trailing_dot_after_min",
+			input: "012-30.N",
+			want:  []string{"012-30.N"},
+		},
+		// Counter-cases: well-formed coords must keep matching unchanged.
+		{
+			name:  "no_dot",
+			input: "52E",
+			want:  []string{"52E"},
+		},
+		{
+			name:  "full_decimal",
+			input: "52.0E",
+			want:  []string{"52.0E"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
 func TestCoordRegexSourceEmbeddable(t *testing.T) {
 	// CoordRegexSource() output must be safe to embed inside a user-defined
 	// named group: it must not contain capture-group syntax of its own.
