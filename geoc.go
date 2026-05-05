@@ -334,6 +334,42 @@ func (cg *coordGroups) normalizeCompact() {
 	}
 }
 
+// normalizeItalianMinFrac handles space-separated forms where the fractional
+// part of minutes is written as 3 digits without a decimal point — common in
+// italian NAVTEX OCR output ("44 33 367N" meaning "44° 33.367' N"). The shape
+// is `<deg> <min> <minFrac3>[NSEW]`, with both separators being plain
+// whitespace and the would-be sec field consisting of exactly 3 ASCII digits.
+// Classical DMS uses "-"/"°"/":" or has a decimal in the sec field, so a
+// pure-space separator with a 3-digit no-decimal trailer is a reliable
+// fingerprint. Without this normalization the candidate is interpreted as
+// DMS and then either rejected (sec ≥ 60, e.g. "367") or — worse — silently
+// produces wrong coordinates (sec < 60, e.g. "048" parsed as 48 seconds).
+func (cg *coordGroups) normalizeItalianMinFrac() {
+	if cg.loc == "" || cg.sec == "" || cg.min == "" {
+		return
+	}
+	if cg.sep.deg != " " || cg.sep.min != " " {
+		return
+	}
+	if len(cg.sec) != 3 {
+		return
+	}
+	if strings.ContainsAny(cg.sec, ".,") {
+		return
+	}
+	for i := 0; i < len(cg.sec); i++ {
+		if cg.sec[i] < '0' || cg.sec[i] > '9' {
+			return
+		}
+	}
+	if strings.ContainsAny(cg.min, ".,") {
+		return
+	}
+	cg.min = cg.min + "." + cg.sec
+	cg.sec = ""
+	cg.sep.min = ""
+}
+
 // normalizeDotDMS handles forms like "70.19.4N" and "018.07.5E".
 // Regex can initially parse them as deg=70.19, min=4. This method
 // converts such shape into regular DMS groups: deg=70, min=19, sec=4.
@@ -467,6 +503,7 @@ func newCoordGroups(cs string) (coordGroups, error) {
 		return cg, fmt.Errorf("%w: extra characters detected", ErrInvalidString)
 	}
 
+	cg.normalizeItalianMinFrac()
 	cg.normalizeDotDMS()
 	cg.normalizeCompact()
 	return cg, nil
@@ -507,6 +544,8 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 		cgLon.sgn = ""
 	}
 
+	cgLat.normalizeItalianMinFrac()
+	cgLon.normalizeItalianMinFrac()
 	cgLat.normalizeDotDMS()
 	cgLon.normalizeDotDMS()
 	cgLat.normalizeCompact()

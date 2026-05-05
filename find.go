@@ -109,6 +109,7 @@ func FindCoords(s string, opts ...FindOption) []Match {
 		}
 
 		cg, _ := coordGroupsFromMatch(groups, subNames)
+		cg.normalizeItalianMinFrac()
 		cg.normalizeDotDMS()
 		cg.normalizeCompact()
 
