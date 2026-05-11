@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.3.5] by 2026-05-11
+
+### Fixed
+
+- `FindCoords` no longer reports date-list fragments before month
+  abbreviations as coordinates, e.g. `24 25 28 NOV` is not returned as
+  `24 25 28 N`.
+- `FindCoords` now preserves the full longitude when a latitude ending in
+  `N`/`S` is followed by a glued hyphen separator, e.g.
+  `41 55.00 N-032 08.00 E` returns `032 08.00 E` instead of the truncated
+  `08.00 E`.
+
 ## [v0.3.4] by 2026-05-05
 
 ### Fixed

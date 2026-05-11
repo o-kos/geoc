@@ -91,6 +91,12 @@ func TestFindCoordsPositive(t *testing.T) {
 			want:  []string{"39 27 25.55N", "009 39 25E"},
 		},
 		{
+			name:  "navtex_pair_with_glued_dash_separator",
+			input: "41 55.00 N-032 08.00 E",
+			opts:  []FindOption{RequireDirection()},
+			want:  []string{"41 55.00 N", "032 08.00 E"},
+		},
+		{
 			name:  "pair_with_comma_separator",
 			input: "lat 39 27N, lon 40 30E end",
 			opts:  []FindOption{RequireDirection()},
@@ -284,6 +290,38 @@ func TestFindCoordsGluedToTerminator(t *testing.T) {
 			name:  "distance_nm_minimal",
 			input: "3 NM",
 			want:  nil,
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
+func TestFindCoordsDateMonthGlueRejected(t *testing.T) {
+	// Date lists before a month abbreviation can look exactly like DMS;
+	// the direction letter is just the first letter of the month.
+	cases := []findCase{
+		{
+			name:  "november_date_list",
+			input: "24 25 28 NOV 25 FROM 0600",
+			want:  nil,
+		},
+		{
+			name:  "september_date_list",
+			input: "12 14 16 SEP 25",
+			want:  nil,
+		},
+		// Counter-cases: non-month terminators remain accepted.
+		{
+			name:  "navtex_terminator_NNN",
+			input: "124-50-00ENNN",
+			want:  []string{"124-50-00E"},
+		},
+		{
+			name:  "message_word",
+			input: "124-50-00EAREA",
+			want:  []string{"124-50-00E"},
 		},
 	}
 	for i := range cases {
