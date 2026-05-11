@@ -120,6 +120,10 @@ func FindCoords(s string, opts ...FindOption) []Match {
 
 		coord, err := cg.getCoord()
 		if err != nil {
+			if isLatLonHyphenSeparator(s, idx[0]) {
+				pos = idx[0] + 1
+				continue
+			}
 			// Backtrack past the first whitespace inside the consumed
 			// candidate so a noise prefix glued to a coord by a space
 			// ("235 43-18.0N") doesn't trap us on a still-valid sub-
@@ -183,6 +187,9 @@ func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 	if !isASCIILetter(rest[0]) {
 		return true
 	}
+	if isMonthGlue(s, locEnd) {
+		return false
+	}
 	// OCR-glue: a single non-direction letter wedged between two adjacent
 	// coordinates ("46-20.0NR142-2.0E"). The next regex pass will pick up
 	// the second coord; here we just accept the current one.
@@ -205,6 +212,38 @@ func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 		}
 	}
 	return true
+}
+
+func isMonthGlue(s string, locEnd int) bool {
+	if locEnd <= 0 {
+		return false
+	}
+	start := locEnd - 1
+	end := locEnd
+	for end < len(s) && isASCIILetter(s[end]) {
+		end++
+	}
+	if end-start != 3 {
+		return false
+	}
+	month := upperASCII(s[start:end])
+	switch month {
+	case "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC":
+		return true
+	}
+	return false
+}
+
+func upperASCII(s string) string {
+	var b [3]byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'a' && c <= 'z' {
+			c -= 'a' - 'A'
+		}
+		b[i] = c
+	}
+	return string(b[:len(s)])
 }
 
 func isASCIILetter(b byte) bool {
@@ -235,6 +274,20 @@ func isOCRGluePrefix(rest string) bool {
 		i++
 	}
 	return i < len(rest) && rest[i] >= '0' && rest[i] <= '9'
+}
+
+func isLatLonHyphenSeparator(s string, hyphen int) bool {
+	if hyphen <= 0 || hyphen+1 >= len(s) || s[hyphen] != '-' {
+		return false
+	}
+	if s[hyphen+1] < '0' || s[hyphen+1] > '9' {
+		return false
+	}
+	prev := hyphen - 1
+	for prev >= 0 && (s[prev] == ' ' || s[prev] == '\t') {
+		prev--
+	}
+	return prev >= 0 && (s[prev] == 'N' || s[prev] == 'S')
 }
 
 // firstSpacePast returns the byte position right after the first ASCII
