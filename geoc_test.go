@@ -367,6 +367,16 @@ func TestParseCoordPositive(t *testing.T) {
 		{`44 33 048N`, 44.5508, LocLat},   // 44° 33.048' N (NOT DMS sec=48)
 		{`012 33.853E`, 12.564217, LocLon},
 
+		// Compact MinDec: degrees and decimal-minutes glued together
+		{`3630.055N`, 36.500917, LocLat},   // 36° 30.055' N
+		{`01202.598E`, 12.043300, LocLon},  // 12° 02.598' E
+		{`3500.00N`, 35.0, LocLat},         // 35° 00.00' N
+		{`01500.00E`, 15.0, LocLon},        // 15° 00.00' E
+		{`3630.055S`, -36.500917, LocLat},  // S → negative
+		{`01202.598W`, -12.043300, LocLon}, // W → negative
+		// Must not collide with existing degDec inputs in range.
+		{`36.5N`, 36.5, LocLat},
+
 		// Trailing dot before direction letter (Case C): "52.E" → 52.0°E
 		{`52.E`, 52, LocLon},
 		{`012-30.N`, 12.5, LocLat},
@@ -397,6 +407,18 @@ func TestParseCoordNegative(t *testing.T) {
 		{`120-5760E`, ErrOutOfRange},
 		{`90-01N`, ErrOutOfRange},
 		{`180-01E`, ErrOutOfRange},
+		// Compact MinDec must not over-trigger: 3-digit integer + decimal
+		// stays degDec and gets rejected by axis range check (not silently
+		// rewritten as 3°65.5').
+		{`365.5N`, ErrOutOfRange},
+		// Compact MinDec with deg > 90 (lat) / > 180 (lon) is also out-of-range.
+		{`9130.0N`, ErrOutOfRange}, // 91° 30.0' N
+		// Minutes part ≥ 60 prevents the rewrite, so 3660.0N stays degDec
+		// and is rejected as out-of-range.
+		{`3660.0N`, ErrOutOfRange},
+		// Bare number without direction letter: not rewritten, falls through
+		// to plain DegDec out-of-range check.
+		{`3630.055`, ErrOutOfRange},
 		{`48"N`, ErrInvalidString},
 		{`48'N`, ErrInvalidString},
 		{`-48N`, ErrInvalidCoord},

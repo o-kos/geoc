@@ -370,6 +370,57 @@ func (cg *coordGroups) normalizeItalianMinFrac() {
 	cg.sep.min = ""
 }
 
+// compactMinDecLatRegExp / compactMinDecLonRegExp match concatenated MinDec
+// integer parts: 2-digit deg + 2-digit min for N/S, 3-digit deg + 2-digit min
+// for E/W. The deg group is range-checked (≤90 / ≤180) and the min group is
+// constrained to `[0-5]\d` so the trailing minutes stay < 60.
+var (
+	compactMinDecLatRegExp = regexp.MustCompile(`^(\d{2})([0-5]\d)\.(\d+)$`)
+	compactMinDecLonRegExp = regexp.MustCompile(`^(\d{3})([0-5]\d)\.(\d+)$`)
+)
+
+// normalizeCompactMinDec handles compact MinDec inputs where degrees and
+// decimal minutes are written as a single concatenated number with no
+// separator, e.g. "3630.055N" meaning 36° 30.055' N, or "01202.598E" meaning
+// 12° 02.598' E. This is the MinDec analogue of the compact DMS form
+// (`DDMMSS`) that normalizeCompact already handles. The regex parses such
+// inputs as a single deg group with a decimal fraction and an empty min/sec,
+// which the degDec branch then rejects as out-of-range (>90 / >180).
+//
+// Trigger is intentionally narrow:
+//   - direction letter is present;
+//   - no deg-min separator was consumed (degDec parse path);
+//   - both min and sec are empty;
+//   - deg matches `^\d{4,5}\.\d+$` — 4 integer digits for N/S or 5 for E/W;
+//   - splitting deg into a leading deg part (2 digits for N/S, 3 for E/W)
+//     and a trailing `\d{2}\.\d+` minutes part keeps the deg part in axis
+//     bounds (≤90 lat, ≤180 lon) and the minutes part < 60.
+func (cg *coordGroups) normalizeCompactMinDec() {
+	if cg.loc == "" || cg.min != "" || cg.sec != "" || cg.sep.deg != "" {
+		return
+	}
+	var re *regexp.Regexp
+	var degMax int
+	switch cg.loc {
+	case "N", "S":
+		re, degMax = compactMinDecLatRegExp, 90
+	case "E", "W":
+		re, degMax = compactMinDecLonRegExp, 180
+	default:
+		return
+	}
+	m := re.FindStringSubmatch(cg.deg)
+	if m == nil {
+		return
+	}
+	degVal, err := strconv.Atoi(m[1])
+	if err != nil || degVal > degMax {
+		return
+	}
+	cg.deg = m[1]
+	cg.min = m[2] + "." + m[3]
+}
+
 // normalizeDotDMS handles forms like "70.19.4N" and "018.07.5E".
 // Regex can initially parse them as deg=70.19, min=4. This method
 // converts such shape into regular DMS groups: deg=70, min=19, sec=4.
@@ -505,6 +556,7 @@ func newCoordGroups(cs string) (coordGroups, error) {
 
 	cg.normalizeItalianMinFrac()
 	cg.normalizeDotDMS()
+	cg.normalizeCompactMinDec()
 	cg.normalizeCompact()
 	return cg, nil
 }
@@ -548,6 +600,8 @@ func newPointGroups(cs string) (coordGroups, coordGroups, error) {
 	cgLon.normalizeItalianMinFrac()
 	cgLat.normalizeDotDMS()
 	cgLon.normalizeDotDMS()
+	cgLat.normalizeCompactMinDec()
+	cgLon.normalizeCompactMinDec()
 	cgLat.normalizeCompact()
 	cgLon.normalizeCompact()
 	return cgLat, cgLon, nil
