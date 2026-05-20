@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.3.7] by 2026-05-20
+
+### Fixed
+
+- `FindCoords` now recognizes compact MinDec inputs (`DDMM.fffN` /
+  `DDDMM.fffE`) that `ParseCoord`/`ParsePoint` already accepted in v0.3.6.
+  The scan path in `find.go` was missing the `normalizeCompactMinDec` step,
+  so NAVTEX traffic with Malta-style compact coordinates (e.g.
+  `3630.055N 01202.598E`) returned no matches under `RequireDirection()`.
+  Closes #27.
+
 ## [v0.3.6] by 2026-05-20
 
 ### Fixed
