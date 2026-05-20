@@ -551,6 +551,42 @@ func TestFindCoordsTrailingDot(t *testing.T) {
 	runFindCases(t, cases)
 }
 
+func TestFindCoordsCompactMinDec(t *testing.T) {
+	// Compact MinDec — degrees and decimal-minutes glued into a single
+	// number with no separator ("3630.055N" = 36° 30.055' N). ParseCoord /
+	// ParsePoint already accept this shape in v0.3.6; FindCoords was missing
+	// the normalizeCompactMinDec step on its scan path.
+	cases := []findCase{
+		{
+			name:  "lat_lon_pair",
+			input: "3630.055N 01202.598E",
+			want:  []string{"3630.055N", "01202.598E"},
+		},
+		{
+			name:  "multiple_pairs_newline",
+			input: "3630.439N 01859.313E\n3501.433N 02211.228E",
+			want: []string{
+				"3630.439N", "01859.313E",
+				"3501.433N", "02211.228E",
+			},
+		},
+		{
+			name:  "zero_pad_frac",
+			input: "3500.00N 01500.00E",
+			want:  []string{"3500.00N", "01500.00E"},
+		},
+		{
+			name:  "embedded_in_text",
+			input: "POSITION 3630.055N 01202.598E REPORTED",
+			want:  []string{"3630.055N", "01202.598E"},
+		},
+	}
+	for i := range cases {
+		cases[i].opts = []FindOption{RequireDirection()}
+	}
+	runFindCases(t, cases)
+}
+
 func TestCoordRegexSourceEmbeddable(t *testing.T) {
 	// CoordRegexSource() output must be safe to embed inside a user-defined
 	// named group: it must not contain capture-group syntax of its own.
