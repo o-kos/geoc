@@ -323,16 +323,28 @@ type coordGroups struct {
 	}
 }
 
+// compactMMSSRegExp matches a 4-digit no-decimal field used by
+// normalizeCompact to split MMSS minutes into separate min/sec fields.
+var compactMMSSRegExp = regexp.MustCompile(`^(\d{2})(\d{2})$`)
+
 // normalizeCompact splits compact MMSS minutes (e.g., "5749")
 // into separate min ("57") and sec ("49") fields.
 func (cg *coordGroups) normalizeCompact() {
-	if len(cg.min) == 4 && cg.sec == "" && cg.loc != "" &&
-		!strings.ContainsAny(cg.min, ".,") {
-		cg.compact = true
-		cg.sec = cg.min[2:]
-		cg.min = cg.min[:2]
+	if cg.sec != "" || cg.loc == "" {
+		return
 	}
+	m := compactMMSSRegExp.FindStringSubmatch(cg.min)
+	if m == nil {
+		return
+	}
+	cg.compact = true
+	cg.min = m[1]
+	cg.sec = m[2]
 }
+
+// italianMinFracRegExp matches a 3-digit no-decimal trailer used by
+// normalizeItalianMinFrac as the fractional-part fingerprint.
+var italianMinFracRegExp = regexp.MustCompile(`^\d{3}$`)
 
 // normalizeItalianMinFrac handles space-separated forms where the fractional
 // part of minutes is written as 3 digits without a decimal point — common in
@@ -345,22 +357,14 @@ func (cg *coordGroups) normalizeCompact() {
 // DMS and then either rejected (sec ≥ 60, e.g. "367") or — worse — silently
 // produces wrong coordinates (sec < 60, e.g. "048" parsed as 48 seconds).
 func (cg *coordGroups) normalizeItalianMinFrac() {
-	if cg.loc == "" || cg.sec == "" || cg.min == "" {
+	if cg.loc == "" || cg.min == "" {
 		return
 	}
 	if cg.sep.deg != " " || cg.sep.min != " " {
 		return
 	}
-	if len(cg.sec) != 3 {
+	if !italianMinFracRegExp.MatchString(cg.sec) {
 		return
-	}
-	if strings.ContainsAny(cg.sec, ".,") {
-		return
-	}
-	for i := 0; i < len(cg.sec); i++ {
-		if cg.sec[i] < '0' || cg.sec[i] > '9' {
-			return
-		}
 	}
 	if strings.ContainsAny(cg.min, ".,") {
 		return
@@ -421,6 +425,10 @@ func (cg *coordGroups) normalizeCompactMinDec() {
 	cg.min = m[2] + "." + m[3]
 }
 
+// dotDMSDegRegExp matches a `deg.min` integer split used by normalizeDotDMS
+// to reshape inputs like "70.19.4N" into regular DMS groups.
+var dotDMSDegRegExp = regexp.MustCompile(`^(\d+)\.(\d+)$`)
+
 // normalizeDotDMS handles forms like "70.19.4N" and "018.07.5E".
 // Regex can initially parse them as deg=70.19, min=4. This method
 // converts such shape into regular DMS groups: deg=70, min=19, sec=4.
@@ -431,16 +439,13 @@ func (cg *coordGroups) normalizeDotDMS() {
 	if strings.ContainsAny(cg.min, ".,") {
 		return
 	}
-	if strings.Count(cg.deg, ".") != 1 {
+	m := dotDMSDegRegExp.FindStringSubmatch(cg.deg)
+	if m == nil {
 		return
 	}
-	parts := strings.SplitN(cg.deg, ".", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return
-	}
-	cg.deg = parts[0]
+	cg.deg = m[1]
 	cg.sec = cg.min
-	cg.min = parts[1]
+	cg.min = m[2]
 	if cg.sep.min == "" {
 		cg.sep.min = "."
 	}
