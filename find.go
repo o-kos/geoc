@@ -111,6 +111,7 @@ func FindCoords(s string, opts ...FindOption) []Match {
 		cg, _ := coordGroupsFromMatch(groups, subNames)
 		cg.normalizeItalianMinFrac()
 		cg.normalizeDotDMS()
+		cg.normalizeCompactMinDec()
 		cg.normalizeCompact()
 
 		if !acceptLetterGlue(s, idx[2*locGroupIndex+1], &cg) {
