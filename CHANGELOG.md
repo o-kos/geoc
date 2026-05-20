@@ -1,6 +1,6 @@
 # Changelog
 
-## [unreleased]
+## [v0.3.6] by 2026-05-20
 
 ### Fixed
 
@@ -12,6 +12,13 @@
   triggered narrowly: requires a direction letter, no deg-min separator,
   exactly 4 (lat) or 5 (lon) integer digits, a decimal fraction, and the
   implied deg/min parts must satisfy axis bounds and `min < 60`.
+
+### Changed
+
+- Internal: `normalizeCompact`, `normalizeItalianMinFrac`, and
+  `normalizeDotDMS` now use precompiled `regexp.Regexp` patterns for their
+  trigger logic, matching the style of `normalizeCompactMinDec`. No behavior
+  change.
 
 ## [v0.3.5] by 2026-05-11
 
