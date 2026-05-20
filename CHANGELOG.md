@@ -1,5 +1,18 @@
 # Changelog
 
+## [unreleased]
+
+### Fixed
+
+- `ParseCoord`/`FindCoords` now recognize compact MinDec inputs where degrees
+  and decimal-minutes are written as a single concatenated number with no
+  separator — common in NAVTEX traffic, e.g. `3630.055N` (36° 30.055′ N) or
+  `01202.598E` (12° 02.598′ E). Without this the shape was parsed as a single
+  degDec value (`3630.055`) and rejected as out-of-range. The rewrite is
+  triggered narrowly: requires a direction letter, no deg-min separator,
+  exactly 4 (lat) or 5 (lon) integer digits, a decimal fraction, and the
+  implied deg/min parts must satisfy axis bounds and `min < 60`.
+
 ## [v0.3.5] by 2026-05-11
 
 ### Fixed
