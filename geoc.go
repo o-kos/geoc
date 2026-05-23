@@ -377,10 +377,14 @@ func (cg *coordGroups) normalizeItalianMinFrac() {
 // compactMinDecLatRegExp / compactMinDecLonRegExp match concatenated MinDec
 // integer parts: 2-digit deg + 2-digit min for N/S, 3-digit deg + 2-digit min
 // for E/W. The deg group is range-checked (≤90 / ≤180) and the min group is
-// constrained to `[0-5]\d` so the trailing minutes stay < 60.
+// constrained to `[0-5]\d` so the trailing minutes stay < 60. The `*Int`
+// variants accept the same shape without a fractional minutes part
+// ("5121N" = 51° 21' N, "00258E" = 2° 58' E).
 var (
-	compactMinDecLatRegExp = regexp.MustCompile(`^(\d{2})([0-5]\d)\.(\d+)$`)
-	compactMinDecLonRegExp = regexp.MustCompile(`^(\d{3})([0-5]\d)\.(\d+)$`)
+	compactMinDecLatRegExp    = regexp.MustCompile(`^(\d{2})([0-5]\d)\.(\d+)$`)
+	compactMinDecLonRegExp    = regexp.MustCompile(`^(\d{3})([0-5]\d)\.(\d+)$`)
+	compactMinDecLatIntRegExp = regexp.MustCompile(`^(\d{2})([0-5]\d)$`)
+	compactMinDecLonIntRegExp = regexp.MustCompile(`^(\d{3})([0-5]\d)$`)
 )
 
 // normalizeCompactMinDec handles compact MinDec inputs where degrees and
@@ -391,38 +395,57 @@ var (
 // inputs as a single deg group with a decimal fraction and an empty min/sec,
 // which the degDec branch then rejects as out-of-range (>90 / >180).
 //
+// WMO No.9 Vol.D NAVTEX/SafetyNET coordinates frequently write the form with
+// whitespace before the direction letter ("5121.00 N", "00258.00 E") and
+// without a fractional minutes part ("5121 N", "00258 E" — DDMM / DDDMM).
+// Both shapes are also normalized here, gated by the same axis/range checks.
+//
 // Trigger is intentionally narrow:
 //   - direction letter is present;
-//   - no deg-min separator was consumed (degDec parse path);
+//   - the deg-min separator is either empty (glued) or a single space
+//     (degDec parse path that hit whitespace before the loc letter);
 //   - both min and sec are empty;
-//   - deg matches `^\d{4,5}\.\d+$` — 4 integer digits for N/S or 5 for E/W;
+//   - deg matches `^\d{4,5}(?:\.\d+)?$` — 4 integer digits for N/S or 5 for
+//     E/W, with an optional decimal fraction;
 //   - splitting deg into a leading deg part (2 digits for N/S, 3 for E/W)
-//     and a trailing `\d{2}\.\d+` minutes part keeps the deg part in axis
-//     bounds (≤90 lat, ≤180 lon) and the minutes part < 60.
+//     and a trailing `\d{2}(?:\.\d+)?` minutes part keeps the deg part in
+//     axis bounds (≤90 lat, ≤180 lon) and the minutes part < 60.
 func (cg *coordGroups) normalizeCompactMinDec() {
-	if cg.loc == "" || cg.min != "" || cg.sec != "" || cg.sep.deg != "" {
+	if cg.loc == "" || cg.min != "" || cg.sec != "" {
 		return
 	}
-	var re *regexp.Regexp
+	if cg.sep.deg != "" && cg.sep.deg != " " {
+		return
+	}
+	var re, reInt *regexp.Regexp
 	var degMax int
 	switch cg.loc {
 	case "N", "S":
-		re, degMax = compactMinDecLatRegExp, 90
+		re, reInt, degMax = compactMinDecLatRegExp, compactMinDecLatIntRegExp, 90
 	case "E", "W":
-		re, degMax = compactMinDecLonRegExp, 180
+		re, reInt, degMax = compactMinDecLonRegExp, compactMinDecLonIntRegExp, 180
 	default:
 		return
 	}
-	m := re.FindStringSubmatch(cg.deg)
-	if m == nil {
+	if m := re.FindStringSubmatch(cg.deg); m != nil {
+		degVal, err := strconv.Atoi(m[1])
+		if err != nil || degVal > degMax {
+			return
+		}
+		cg.deg = m[1]
+		cg.min = m[2] + "." + m[3]
+		cg.sep.deg = ""
 		return
 	}
-	degVal, err := strconv.Atoi(m[1])
-	if err != nil || degVal > degMax {
-		return
+	if m := reInt.FindStringSubmatch(cg.deg); m != nil {
+		degVal, err := strconv.Atoi(m[1])
+		if err != nil || degVal > degMax {
+			return
+		}
+		cg.deg = m[1]
+		cg.min = m[2]
+		cg.sep.deg = ""
 	}
-	cg.deg = m[1]
-	cg.min = m[2] + "." + m[3]
 }
 
 // dotDMSDegRegExp matches a `deg.min` integer split used by normalizeDotDMS

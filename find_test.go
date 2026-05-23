@@ -580,6 +580,24 @@ func TestFindCoordsCompactMinDec(t *testing.T) {
 			input: "POSITION 3630.055N 01202.598E REPORTED",
 			want:  []string{"3630.055N", "01202.598E"},
 		},
+		// WMO No.9 Vol.D NAVTEX/SafetyNET form: whitespace before direction
+		// letter ("5121.00 N" = 51° 21.00' N).
+		{
+			name:  "wmo_space_before_letter",
+			input: "5121.00 N 00258.00 E",
+			want:  []string{"5121.00 N", "00258.00 E"},
+		},
+		{
+			name:  "wmo_embedded_in_text",
+			input: "AREA 5121.00 N 00258.00 E ENDS",
+			want:  []string{"5121.00 N", "00258.00 E"},
+		},
+		// Integer DDMM / DDDMM (no fractional minutes part).
+		{
+			name:  "integer_ddmm",
+			input: "5121 N 00258 E",
+			want:  []string{"5121 N", "00258 E"},
+		},
 	}
 	for i := range cases {
 		cases[i].opts = []FindOption{RequireDirection()}
