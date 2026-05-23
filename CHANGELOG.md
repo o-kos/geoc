@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.3.8] by 2026-05-23
+
+### Added
+
+- `ParseCoord`/`FindCoords` now accept the packed MinDec coordinate form
+  with whitespace before the direction letter — the WMO No.9 Vol.D
+  NAVTEX/SafetyNET shape used in real traffic (e.g. OOSTENDERADIO):
+  `5121.00 N` (51° 21.00′ N), `00258.00 E` (2° 58.00′ E). Previously only
+  the glued variant (`5121.00N`, `00258.00E`) parsed; the spaced form was
+  rejected as a single out-of-range degDec value.
+- The packed form without a fractional minutes part is also recognized —
+  `5121 N` (DDMM, 51° 21′ N) and `00258 E` (DDDMM, 2° 58′ E). Closes #29.
+
+The same axis (`≤90` / `≤180`) and minutes (`[0-5]\d`) range checks gate
+the rewrite, so degDec inputs in range (`48 N`, `36.5N`) and bare
+out-of-range numbers without a direction letter keep their previous
+error behavior.
+
 ## [v0.3.7] by 2026-05-21
 
 ### Fixed
