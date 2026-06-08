@@ -1,5 +1,20 @@
 # Changelog
 
+## [unreleased]
+
+### Changed
+
+- `FindCoords` no longer accepts a fully specified DMS candidate whose
+  direction letter is glued to a trailing all-letter word. The letter is the
+  head of that word, not a coordinate's direction, so `59 1900 NAVIGATION`
+  (e.g. the end of a `0500 /59 1900` time interval) no longer yields a spurious
+  `59 1900 N`. geoc can't locally tell a borrowed word-initial letter from a
+  real NAVTEX terminator, so terminators are dropped too — `124-50-00ENNN` now
+  returns nothing instead of `124-50-00E`; stripping them is the consumer's
+  job. Direction letters followed by space/punctuation (`30N END`,
+  `5121.00 N ... E ENDS`) and OCR-glue bridges (`46-20.0NR142-2.0E`) are
+  unaffected. Closes #32.
+
 ## [v0.3.8] by 2026-05-23
 
 ### Added

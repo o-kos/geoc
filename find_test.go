@@ -272,16 +272,29 @@ func TestFindCoordsNoCrossLineGreedy(t *testing.T) {
 	runFindCases(t, cases)
 }
 
-func TestFindCoordsGluedToTerminator(t *testing.T) {
-	// A fully-specified coord glued to a non-coord word (NAVTEX terminator
-	// "NNN", message "END", etc.) must still be returned. The trailing
-	// letters can't themselves form a coordinate, so the strict
-	// letter-glue check is too aggressive in this shape.
+func TestFindCoordsGluedToWordRejected(t *testing.T) {
+	// A direction letter immediately glued to an all-letter word is the head
+	// of that word, not a coordinate's direction. geoc can't locally tell a
+	// borrowed word-initial letter ("59 1900 N"avigation) from a real NAVTEX
+	// terminator ("124-50-00ENNN"), so it drops both — stripping terminators
+	// is the consumer's job.
 	cases := []findCase{
 		{
 			name:  "navtex_terminator_NNN",
 			input: "124-50-00ENNN",
-			want:  []string{"124-50-00E"},
+			want:  nil,
+		},
+		{
+			name:  "navtex_terminator_AREA",
+			input: "124-50-00EAREA",
+			want:  nil,
+		},
+		// The reported false positive: "59 1900" is the end of a time
+		// interval, the N is borrowed from NAVIGATION.
+		{
+			name:  "time_interval_glued_to_word",
+			input: "0500 /59 1900 NAVIGATION PROHIBITED",
+			want:  nil,
 		},
 		// Counter-case: a minimal coord "3 N" glued to "M" (3 NM = 3
 		// nautical miles) must keep being rejected — the candidate has
@@ -312,16 +325,17 @@ func TestFindCoordsDateMonthGlueRejected(t *testing.T) {
 			input: "12 14 16 SEP 25",
 			want:  nil,
 		},
-		// Counter-cases: non-month terminators remain accepted.
+		// Non-month terminators are dropped too: a direction letter glued
+		// to a word is never a coordinate.
 		{
 			name:  "navtex_terminator_NNN",
 			input: "124-50-00ENNN",
-			want:  []string{"124-50-00E"},
+			want:  nil,
 		},
 		{
 			name:  "message_word",
 			input: "124-50-00EAREA",
-			want:  []string{"124-50-00E"},
+			want:  nil,
 		},
 	}
 	for i := range cases {
@@ -432,11 +446,12 @@ func TestFindCoordsOCRGlue(t *testing.T) {
 			input: "30NXY12",
 			want:  nil,
 		},
-		// Already worked in v0.3.2; lock it in.
+		// A direction letter glued to a word (not an OCR bridge to a
+		// digit) is dropped: "124-50-00ENNN" yields nothing.
 		{
 			name:  "navtex_terminator_NNN",
 			input: "124-50-00ENNN",
-			want:  []string{"124-50-00E"},
+			want:  nil,
 		},
 		{
 			name:  "minimal_with_terminator_word",
