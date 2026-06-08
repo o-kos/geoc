@@ -172,11 +172,11 @@ func FindCoords(s string, opts ...FindOption) []Match {
 //
 //   - Unit suffix (".M.", " MILE", "KM" etc.): always drops, since the
 //     direction letter is part of a distance token, not a coordinate.
-//   - Plain letter glue (e.g. "1NORTH", "3 NM"): drops minimal candidates
-//     (no min/sec) where the trailing word could be anything, but accepts
-//     fully-specified DMS candidates whose trailing letters can't form a
-//     coord on their own (NAVTEX terminator "NNN", message words like
-//     "END"/"AREA"). See TestFindCoordsGluedToTerminator.
+//   - Plain letter glue (e.g. "1NORTH", "3 NM", "59 1900 NAVIGATION"): drops
+//     the candidate, since a direction letter glued to letters is the head of
+//     a word, not a coordinate's direction. NAVTEX terminators are dropped too
+//     ("124-50-00ENNN" yields nothing); stripping them is the consumer's job.
+//     The OCR-glue bridge to an adjacent coord is the one kept exception.
 func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 	if cg.loc == "" || locEnd < 0 || locEnd >= len(s) {
 		return true
@@ -197,22 +197,13 @@ func acceptLetterGlue(s string, locEnd int, cg *coordGroups) bool {
 	if !isDirectionLetter(rest[0]) && isOCRGluePrefix(rest) {
 		return true
 	}
-	// Trailing letter glue. Keep the candidate only if it has full DMS
-	// structure (deg+min+sec) AND the trailing alphanumeric run contains
-	// no digits — i.e. it's a word, not another glued coord.
-	if cg.sec == "" {
-		return false
-	}
-	for i := 0; i < len(rest); i++ {
-		c := rest[i]
-		if c >= '0' && c <= '9' {
-			return false
-		}
-		if !isASCIILetter(c) {
-			break
-		}
-	}
-	return true
+	// Trailing letter glue: a direction letter immediately followed by more
+	// letters belongs to that word, not to a coordinate ("59 1900 NAVIGATION"
+	// borrows the N from NAVIGATION). geoc can't locally tell a borrowed
+	// word-initial letter from a real NAVTEX terminator ("124-50-00ENNN" ->
+	// "124-50-00E") — the forms are identical — so it does not guess. Such
+	// candidates are dropped; stripping terminators is the consumer's job.
+	return false
 }
 
 func isMonthGlue(s string, locEnd int) bool {
